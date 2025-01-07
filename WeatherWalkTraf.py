@@ -207,6 +207,10 @@ def main():
         # running.
         world = client.get_world()
 
+        weather = Weather(world.get_weather(), 'weathers.yaml')
+        weather.next()
+        world.set_weather(weather.weather)
+
         # Change some world setting to make things faster
         # settings = world.get_settings()
         # settings.fixed_delta_seconds = 0.05
@@ -316,9 +320,6 @@ def main():
 
         t_end = time.time() + 2520
 
-        weather = Weather(world.get_weather(), 'weathers.yaml')
-        weather.next()
-        world.set_weather(weather.weather)
         # while time.time() < t_end:
         last_value = 0
         while True:

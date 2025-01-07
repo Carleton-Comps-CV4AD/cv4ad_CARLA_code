@@ -11,13 +11,13 @@ states:
 
   - name: sunset
     azimuth: 0
-    altitude: 20
-    cloudiness: 50
-    precipitation: 20
-    precipitation_deposits: 20
-    wind_intensity: 20
-    fog_density: 20
-    wetness: 20
+    altitude: 10
+    cloudiness: 10
+    precipitation: 10
+    precipitation_deposits: 10
+    wind_intensity: 10
+    fog_density: 0
+    wetness: 10
   
   - name: night
     azimuth: 0
