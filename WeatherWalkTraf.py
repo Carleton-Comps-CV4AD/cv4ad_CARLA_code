@@ -109,7 +109,7 @@ def save_image(image, counter, name, file_type, cc = None):
     counter.pp()
 
 # ! Temporary function to fill the scene with vehicles and pedestrians. We should paratmetrize and organize this so that we can configure the scene easily
-def initialize_agents(world, client, actor_list, traffic_manager):
+def initialize_agents(world, client, actor_list, traffic_manager, spawn_points):
     # Select some models from the blueprint library
     models = ['dodge', 'audi', 'model3', 'mini', 'mustang', 'lincoln', 'prius', 'nissan', 'crown', 'impala']
     blueprints = []
@@ -307,11 +307,11 @@ def main():
         #         npc.set_autopilot(True)
         #         print('created %s' % npc.type_id)
 
-        vehicles = initialize_agents(world, client, actor_list, traffic_manager)
+        vehicles = initialize_agents(world, client, actor_list, traffic_manager, spawn_points)
 
         t_end = time.time() + 2520
 
-        weather = Weather(world.get_weather())
+        weather = Weather(world.get_weather(), 'weathers.yaml')
         world.set_weather(weather.weather)
         # while time.time() < t_end:
         while True:
