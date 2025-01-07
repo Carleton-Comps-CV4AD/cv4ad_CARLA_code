@@ -189,80 +189,37 @@ def main():
         lidar_seg = blueprint_library.find('sensor.lidar.ray_cast_semantic')
         lidar_seg_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
 
-        # Now we register the function that will be called each time the sensor
-        # receives an image. In this example print(client.get_available_maps())we are saving the image to disk
-        # converting the pixels to gray-scale.
-        cc = carla.ColorConverter.Raw
-
-        class myint():
+        class counter():
             def __init__(self, value):
                 self.value = value
 
             def pp(self):
                 self.value += 1
         
-        counter = myint(0)
-        counter2 = myint(0)
-        counter3 = myint(0)
-        counter4 = myint(0)
+        # TODO: do we really need 4 of these?
+        rgb_cam_counter = counter(0)
+        rgb_seg_counter = counter(0)
+        lidar_cam_counter = counter(0)
+        lidar_seg_counter = counter(0)
 
-                
-       
-
-        rgb_cam_listen = lambda image: save_image(image, counter = counter, 
+        # Now we register the function that will be called each time the sensor receives an image.
+        cc = carla.ColorConverter.Raw
+        rgb_cam_listen = lambda image: save_image(image, counter = rgb_cam_counter, 
                         name = '_outRaw/raw', file_type = 'png', cc = cc)
         
-        rgb_seg_listen = lambda image: save_image(image, counter = counter2, 
+        rgb_seg_listen = lambda image: save_image(image, counter = rgb_seg_counter, 
                         name = '_outSeg/seg', file_type = 'png')
 
-        lidar_cam_listen = lambda image: save_image(image, counter = counter3, 
+        lidar_cam_listen = lambda image: save_image(image, counter = lidar_cam_counter, 
                         name = '_outLIDAR/raw', file_type = 'ply')
 
-        lidar_seg_listen = lambda image: save_image(image, counter = counter4, 
+        lidar_seg_listen = lambda image: save_image(image, counter = lidar_seg_counter, 
                         name = '_outLIDARseg/seg', file_type = 'ply')
 
         ego.add_camera(rgb_cam, rgb_cam_transform, rgb_cam_listen)
         ego.add_camera(rgb_seg, rgb_seg_transform, rgb_seg_listen)
         ego.add_camera(lidar_cam, lidar_cam_transform, lidar_cam_listen)
         ego.add_camera(lidar_seg, lidar_seg_transform, lidar_seg_listen)
-
-        # Now we register the function that will be called each time the sensor
-        # receives an image. In this example print(client.get_available_maps())we are saving the image to disk
-        # converting the pixels to gray-scale.
-        cc = carla.ColorConverter.Raw
-
-        class myint():
-            def __init__(self, value):
-                self.value = value
-
-            def pp(self):
-                self.value += 1
-        
-        counter = myint(0)
-        counter2 = myint(0)
-        counter3 = myint(0)
-        counter4 = myint(0)
-
-                
-        def save_image(image, counter, name, file_type, cc = None):
-            image_path = f'{name}_{counter.value}.{file_type}'
-            if cc:
-                image.save_to_disk(image_path, cc)
-            else:
-                image.save_to_disk(image_path)
-            counter.pp()
-
-        rgb_cam_listen = lambda image: save_image(image, counter = counter, 
-                        name = '_outRaw/raw', file_type = 'png', cc = cc)
-        
-        rgb_seg_listen = lambda image: save_image(image, counter = counter2, 
-                        name = '_outSeg/seg', file_type = 'png')
-
-        lidar_cam_listen = lambda image: save_image(image, counter = counter3, 
-                        name = '_outLIDAR/raw', file_type = 'ply')
-
-        lidar_seg_listen = lambda image: save_image(image, counter = counter4, 
-                        name = '_outLIDARseg/seg', file_type = 'ply')
 
         # Store so we can delete later. Actors do not get removed automatically
         actor_list.append(ego.vehicle)
@@ -275,7 +232,6 @@ def main():
         #     color = random.choice(bp.get_attribute('color').recommended_values)
         #     bp.set_attribute('color', color)
 
-        
         # Route 1
         # Create route 1 from the chosen spawn points
         # route_1_indices = [17, 70, 130, 29, 79, 101, 55, 57, 119, 59, 112, 32]
@@ -308,7 +264,6 @@ def main():
             traffic_manager.random_right_lanechange_percentage(v, 0)
             traffic_manager.auto_lane_change(v, False)  
         
-
         # Spawn walkers
         blueprint_library = world.get_blueprint_library()
         walker_bp = blueprint_library.filter('walker.pedestrian.*')
@@ -332,43 +287,34 @@ def main():
             walker_bp_choice = random.choice(walker_bp)
             sbatch.append(carla.command.SpawnActor(walker_bp_choice, spawn_point))
 
-
         results = client.apply_batch_sync(sbatch, True)
-
 
         for result in results:
             if not result.error:
                 walkers.append(result.actor_id)
 
-
         batch = []
         for walker_id in walkers:
             batch.append(carla.command.SpawnActor(walker_controller_bp, carla.Transform(), walker_id))
 
-
         results = client.apply_batch_sync(batch, True)
-
 
         for result in results:
             if not result.error:
                 controllers.append(result.actor_id)
 
-
         walker_actors = [world.get_actor(w) for w in walkers]
         controller_actors = [world.get_actor(c) for c in controllers]
-
 
         for controller in controller_actors:
             controller.start()
             controller.go_to_location(world.get_random_location_from_navigation())
             controller.set_max_speed(random.uniform(1.0, 3.0))  # Random speeds
 
-
         print(f"Spawned {len(walkers)} walkers.")
 
         actor_list.extend(walker_actors)
         actor_list.extend(controller_actors)
-
 
         # # But the city now is probably quite empty, let's add a few more
         # # vehicles.
