@@ -119,11 +119,21 @@ class Ego_Vehicle():
         self.vehicle.set_autopilot(True)
         print('created %s' % self.vehicle.type_id)
 
-    def add_camera(self, blueprint, camera_transform):
+    def add_camera(self, blueprint, camera_transform, listen):
         blueprint.set_attribute('sensor_tick', str(SECONDS_PER_TICK))
         camera = self.world.spawn_actor(blueprint, camera_transform, attach_to=self.vehicle)
+        camera.listen(listen)
         self.cameras.append(camera)
         print('created %s' % camera.type_id)
+
+
+def save_image(image, counter, name, file_type, cc = None):
+    image_path = f'{name}_{counter.value}.{file_type}'
+    if cc:
+        image.save_to_disk(image_path, cc)
+    else:
+        image.save_to_disk(image_path)
+    counter.pp()
 
 
 def main():
@@ -163,7 +173,7 @@ def main():
         spawn_points = world.get_map().get_spawn_points()
         spawn_point_1 =  spawn_points[32]
 
-        ego = Ego_Vehicle(bp, blueprint_library, world, spawn_point_1)
+        ego = Ego_Vehicle(bp, world, spawn_point_1)
 
         # Add our cameras
         #https://github.com/carla-simulator/carla/issues/2176 (bless)
@@ -179,10 +189,42 @@ def main():
         lidar_seg = blueprint_library.find('sensor.lidar.ray_cast_semantic')
         lidar_seg_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
 
-        ego.add_camera(rgb_cam, rgb_cam_transform)
-        ego.add_camera(rgb_seg, rgb_seg_transform)
-        ego.add_camera(lidar_cam, lidar_cam_transform)
-        ego.add_camera(lidar_seg, lidar_seg_transform)
+        # Now we register the function that will be called each time the sensor
+        # receives an image. In this example print(client.get_available_maps())we are saving the image to disk
+        # converting the pixels to gray-scale.
+        cc = carla.ColorConverter.Raw
+
+        class myint():
+            def __init__(self, value):
+                self.value = value
+
+            def pp(self):
+                self.value += 1
+        
+        counter = myint(0)
+        counter2 = myint(0)
+        counter3 = myint(0)
+        counter4 = myint(0)
+
+                
+       
+
+        rgb_cam_listen = lambda image: save_image(image, counter = counter, 
+                        name = '_outRaw/raw', file_type = 'png', cc = cc)
+        
+        rgb_seg_listen = lambda image: save_image(image, counter = counter2, 
+                        name = '_outSeg/seg', file_type = 'png')
+
+        lidar_cam_listen = lambda image: save_image(image, counter = counter3, 
+                        name = '_outLIDAR/raw', file_type = 'ply')
+
+        lidar_seg_listen = lambda image: save_image(image, counter = counter4, 
+                        name = '_outLIDARseg/seg', file_type = 'ply')
+
+        ego.add_camera(rgb_cam, rgb_cam_transform, rgb_cam_listen)
+        ego.add_camera(rgb_seg, rgb_seg_transform, rgb_seg_listen)
+        ego.add_camera(lidar_cam, lidar_cam_transform, lidar_cam_listen)
+        ego.add_camera(lidar_seg, lidar_seg_transform, lidar_seg_listen)
 
         # Now we register the function that will be called each time the sensor
         # receives an image. In this example print(client.get_available_maps())we are saving the image to disk
@@ -210,18 +252,17 @@ def main():
                 image.save_to_disk(image_path)
             counter.pp()
 
-        rgb_cam.listen(lambda image: save_image(image, counter = counter, 
-                        name = '_outRaw/raw', file_type = 'png', cc = cc))
+        rgb_cam_listen = lambda image: save_image(image, counter = counter, 
+                        name = '_outRaw/raw', file_type = 'png', cc = cc)
         
-        # cc2 = carla.ColorConverter.CityScapesPalette
-        rgb_seg.listen(lambda image: save_image(image, counter = counter2, 
-                        name = '_outSeg/seg', file_type = 'png'))
+        rgb_seg_listen = lambda image: save_image(image, counter = counter2, 
+                        name = '_outSeg/seg', file_type = 'png')
 
-        lidar_cam.listen(lambda image: save_image(image, counter = counter3, 
-                        name = '_outLIDAR/raw', file_type = 'ply'))
+        lidar_cam_listen = lambda image: save_image(image, counter = counter3, 
+                        name = '_outLIDAR/raw', file_type = 'ply')
 
-        lidar_seg.listen(lambda image: save_image(image, counter = counter4, 
-                        name = '_outLIDARseg/seg', file_type = 'ply'))
+        lidar_seg_listen = lambda image: save_image(image, counter = counter4, 
+                        name = '_outLIDARseg/seg', file_type = 'ply')
 
         # Store so we can delete later. Actors do not get removed automatically
         actor_list.append(ego.vehicle)
