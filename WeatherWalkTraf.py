@@ -6,10 +6,20 @@
 # This work is licensed under the terms of the MIT license.
 # For a copy, see <https://opensource.org/licenses/MIT>.
 
+# Modified by cv4ad
+
 import glob
 import os
 import sys
+import carla # type: ignore
+import random
+import time
+import math
+import argparse
+import math
 
+# Global configuration
+SECONDS_PER_TICK = 5.0 # seconds per tick
 
 try:
     sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -19,17 +29,7 @@ try:
 except IndexError:
     pass
 
-import carla # type: ignore
-
-import random
-import time
-import math
-
 #WEATHER STUFF
-
-import argparse
-import math
-
 
 def clamp(value, minimum=0.0, maximum=100.0):
     return max(minimum, min(value, maximum))
@@ -102,11 +102,29 @@ class Weather(object):
 
     def __str__(self):
         return '%s %s' % (self._sun, self._storm)
+    
+class Ego_Vehicle():
+    def __init__(self, blueprint, world, spawn_point):
+        self.bp = blueprint
+        self.spawn_point = spawn_point
+        self.cameras = []
+        self.world = world
 
+        # Now we need to give an initial transform to the vehicle. We choose a
+        # random transform from the list of recommended spawn points of the map.
+        transform = spawn_point
 
-# seconds per tick
-SPT = 5.0
-SSPT = 300.0
+        # So let's tell the world to spawn the vehicle.
+        self.vehicle = world.spawn_actor(blueprint, transform)
+        self.vehicle.set_autopilot(True)
+        print('created %s' % self.vehicle.type_id)
+
+    def add_camera(self, blueprint, camera_transform):
+        blueprint.set_attribute('sensor_tick', str(SECONDS_PER_TICK))
+        camera = self.world.spawn_actor(blueprint, camera_transform, attach_to=self.vehicle)
+        self.cameras.append(camera)
+        print('created %s' % camera.type_id)
+
 
 def main():
     actor_list = []
@@ -126,14 +144,10 @@ def main():
         # running.
         world = client.get_world()
 
-
         # Change some world setting to make things faster
         # settings = world.get_settings()
         # settings.fixed_delta_seconds = 0.05
         # world.apply_settings(settings)
-
-
-
 
         traffic_manager = client.get_trafficmanager()
 
@@ -146,84 +160,29 @@ def main():
         # Now let's filter all the blueprints of type 'vehicle' and choose one
         # at random.
         bp = random.choice(blueprint_library.filter('cybertruck'))
-        bp2 = random.choice(blueprint_library.filter('charger_police'))
-
-        # A blueprint contains the list of attributes that define a vehicle's
-        # instance, we can read them and modify some of them. For instance,
-        # let's randomize its color.
-        if bp.has_attribute('color'):
-            color = random.choice(bp.get_attribute('color').recommended_values)
-            bp.set_attribute('color', color)
-
         spawn_points = world.get_map().get_spawn_points()
-        # Route 1
         spawn_point_1 =  spawn_points[32]
-        # Create route 1 from the chosen spawn points
-        route_1_indices = [17, 70, 130, 29, 79, 101, 55, 57, 119, 59, 112, 32]
-        route_1 = []
-        for ind in route_1_indices:
-            route_1.append(spawn_points[ind].location)
 
-        spawn_point_2 =  spawn_points[125]
-        route_2_indices = [7, 9, 15, 69, 113, 20, 44, 41, 117]
-        route_2 = []
-        for ind in route_2_indices:
-            route_2.append(spawn_points[ind].location)
+        ego = Ego_Vehicle(bp, blueprint_library, world, spawn_point_1)
 
-
-        # Now we need to give an initial transform to the vehicle. We choose a
-        # random transform from the list of recommended spawn points of the map.
-        transform = spawn_point_1
-        transform2 = spawn_point_2
-
-        # So let's tell the world to spawn the vehicle.
-        vehicle = world.spawn_actor(bp, transform)
-        police = world.spawn_actor(bp2, transform2)
-
-        # It is important to note that the actors we create won't be destroyed
-        # unless we call their "destroy" function. If we fail to call "destroy"
-        # they will stay in the simulation even after we quit the Python script.
-        # For that reason, we are storing all the actors we create so we can
-        # destroy them afterwards.
-        actor_list.append(vehicle)
-        actor_list.append(police)
-        print('created %s' % vehicle.type_id)
-        print('created %s' % police.type_id)
-
-
-        # Let's add now a "depth" camera attached to the vehicle. Note that the
-        # transform we give here is now relative to the vehicle.
-        camera_bp = blueprint_library.find('sensor.camera.rgb')
+        # Add our cameras
         #https://github.com/carla-simulator/carla/issues/2176 (bless)
-        camera_bp.set_attribute('sensor_tick', str(SPT))
-        camera_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
-        camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
-        actor_list.append(camera)
-        print('created %s' % camera.type_id)
+        rgb_cam = blueprint_library.find('sensor.camera.rgb')
+        rgb_cam_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
 
-        camera2_bp = blueprint_library.find('sensor.camera.semantic_segmentation')
-        camera2_bp.set_attribute('sensor_tick', str(SPT))
-        camera2_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
-        camera2 = world.spawn_actor(camera2_bp, camera2_transform, attach_to=vehicle)
-        actor_list.append(camera2)
+        rgb_seg = blueprint_library.find('sensor.camera.semantic_segmentation')
+        rgb_seg_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
 
-        traffic_manager.set_path(police, route_2)
-        print('created %s' % camera2.type_id)
+        lidar_cam = blueprint_library.find('sensor.lidar.ray_cast')
+        lidar_cam_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
 
-        camera3_bp = blueprint_library.find('sensor.lidar.ray_cast')
-        camera3_bp.set_attribute('sensor_tick', str(SPT))
-        camera3_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
-        camera3 = world.spawn_actor(camera3_bp, camera3_transform, attach_to=vehicle)
-        actor_list.append(camera3)
-        print('created %s' % camera3.type_id)
+        lidar_seg = blueprint_library.find('sensor.lidar.ray_cast_semantic')
+        lidar_seg_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
 
-        camera4_bp = blueprint_library.find('sensor.lidar.ray_cast_semantic')
-        camera4_bp.set_attribute('sensor_tick', str(SPT))
-        camera4_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
-        camera4 = world.spawn_actor(camera4_bp, camera4_transform, attach_to=vehicle)
-        actor_list.append(camera4)
-        print('created %s' % camera4.type_id)
-
+        ego.add_camera(rgb_cam, rgb_cam_transform)
+        ego.add_camera(rgb_seg, rgb_seg_transform)
+        ego.add_camera(lidar_cam, lidar_cam_transform)
+        ego.add_camera(lidar_seg, lidar_seg_transform)
 
         # Now we register the function that will be called each time the sensor
         # receives an image. In this example print(client.get_available_maps())we are saving the image to disk
@@ -251,46 +210,39 @@ def main():
                 image.save_to_disk(image_path)
             counter.pp()
 
-        # camera.listen(lambda image: image.save_to_disk(f'_outRaw/raw_{counter}.png', cc))
-        
-        # # cc2 = carla.ColorConverter.CityScapesPalette
-        # camera2.listen(lambda image: image.save_to_disk(f'_outSeg/seg_{counter}.png'))
-
-        # camera3.listen(lambda image: image.save_to_disk(f'_outLIDAR/raw_{counter}.ply'))
-
-        # camera4.listen(lambda image: image.save_to_disk(f'_outLIDARseg/seg_{counter}.ply'))
-
-        camera.listen(lambda image: save_image(image, counter = counter, 
+        rgb_cam.listen(lambda image: save_image(image, counter = counter, 
                         name = '_outRaw/raw', file_type = 'png', cc = cc))
         
         # cc2 = carla.ColorConverter.CityScapesPalette
-        camera2.listen(lambda image: save_image(image, counter = counter2, 
+        rgb_seg.listen(lambda image: save_image(image, counter = counter2, 
                         name = '_outSeg/seg', file_type = 'png'))
 
-        camera3.listen(lambda image: save_image(image, counter = counter3, 
+        lidar_cam.listen(lambda image: save_image(image, counter = counter3, 
                         name = '_outLIDAR/raw', file_type = 'ply'))
 
-        camera4.listen(lambda image: save_image(image, counter = counter4, 
+        lidar_seg.listen(lambda image: save_image(image, counter = counter4, 
                         name = '_outLIDARseg/seg', file_type = 'ply'))
 
-        # Oh wait, I don't like the location we gave to the vehicle, I'm going
-        # to move it a bit forward.
-        location = vehicle.get_location()
-        vehicle.set_location(location)
-        print('moved vehicle to %s' % location)
+        # Store so we can delete later. Actors do not get removed automatically
+        actor_list.append(ego.vehicle)
+        actor_list.extend(ego.cameras)
 
-        location2 = police.get_location()
-        police.set_location(location2)
-        print('moved vehicle to %s' % location2)
+        # A blueprint contains the list of attributes that define a vehicle's
+        # instance, we can read them and modify some of them. For instance,
+        # let's randomize its color.
+        # if bp.has_attribute('color'):
+        #     color = random.choice(bp.get_attribute('color').recommended_values)
+        #     bp.set_attribute('color', color)
 
-        vehicle.set_autopilot(True)
-        police.set_autopilot(True)
+        
+        # Route 1
+        # Create route 1 from the chosen spawn points
+        # route_1_indices = [17, 70, 130, 29, 79, 101, 55, 57, 119, 59, 112, 32]
+        # route_1 = []
+        # for ind in route_1_indices:
+        #     route_1.append(spawn_points[ind].location)
 
-
-
-        traffic_manager.set_path(vehicle, route_1)
-
-        traffic_manager.set_path(police, route_2)
+        # traffic_manager.set_path(vehicle, route_1)
 
         # Select some models from the blueprint library
         models = ['dodge', 'audi', 'model3', 'mini', 'mustang', 'lincoln', 'prius', 'nissan', 'crown', 'impala']
@@ -406,27 +358,9 @@ def main():
             sys.stdout.write('\r' + str(weather) + 12 * ' ')
             sys.stdout.flush()
 
-            # if vehicle.is_at_traffic_light():
-            #     traffic_light = vehicle.get_traffic_light()
-            #     if traffic_light.get_state() == carla.TrafficLightState.Red:
-            #         traffic_light.set_state(carla.TrafficLightState.Green)
-            #         traffic_light.set_green_time(4.0)
-            #         print('telsa light changed')
-        
-            # if police.is_at_traffic_light():
-            #     traffic_light2 = police.get_traffic_light()
-            #     if traffic_light2.get_state() == carla.TrafficLightState.Red:
-            #         traffic_light2.set_state(carla.TrafficLightState.Green)
-            #         traffic_light2.set_green_time(4.0)
-            #         print('police light changed')
-
     finally:
 
         print('destroying actors')
-        camera.destroy()
-        camera2.destroy()
-        camera3.destroy()
-        camera4.destroy()
         client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
         client.apply_batch([carla.command.DestroyActor(x) for x in vehicles])
         print('done.')
