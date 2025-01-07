@@ -60,7 +60,7 @@ class Weather(object):
 
     def next(self):
         state = self.states.__next__()
-        print(f'setting weather to {self.states['name']}')
+        print(f"setting weather to", state['name'])
 
         # self._sun.set_azimuth(state.azimuth) see the comment on alititude in the yaml
         self._sun.set_altitude(state['altitude'])
