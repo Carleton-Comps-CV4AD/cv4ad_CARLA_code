@@ -61,7 +61,7 @@ class Weather(object):
     def next(self):
         state = self.states.__next__()
         # self._sun.set_azimuth(state.azimuth) see the comment on alititude in the yaml
-        self._sun.set_alititude(state['altitude'])
+        self._sun.set_altitude(state['altitude'])
 
         self.weather.cloudiness = state['cloudiness']
         self.weather.precipitation = state['precipitation']
@@ -106,7 +106,7 @@ def save_image(image, counter, name, file_type, cc = None):
         image.save_to_disk(image_path, cc)
     else:
         image.save_to_disk(image_path)
-    counter.pp()
+    counter.increment()
 
 # ! Temporary function to fill the scene with vehicles and pedestrians. We should paratmetrize and organize this so that we can configure the scene easily
 def initialize_agents(world, client, actor_list, traffic_manager, spawn_points):
@@ -242,7 +242,7 @@ def main():
             def __init__(self, value):
                 self.value = value
 
-            def pp(self):
+            def increment(self):
                 self.value += 1
         
         # TODO: do we really need 4 of these?
@@ -312,9 +312,13 @@ def main():
         t_end = time.time() + 2520
 
         weather = Weather(world.get_weather(), 'weathers.yaml')
+        weather.next()
+        world.set_weather(weather.weather)
         # while time.time() < t_end:
+        last_value = 0
         while True:
-            if rgb_cam_counter.value % 2 == 0:
+            if rgb_cam_counter.value != last_value and rgb_cam_counter.value % 2 == 0:
+                last_value = rgb_cam_counter.value
                 try:
                     weather.next()
                 except StopIteration:

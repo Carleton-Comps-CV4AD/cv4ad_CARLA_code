@@ -9,7 +9,7 @@ states:
     wetness: 0
 
   - azimuth: 0
-    altitude: 0
+    altitude: 20
     cloudiness: 50
     precipitation: 20
     precipitation_deposits: 20
