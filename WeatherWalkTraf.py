@@ -60,6 +60,8 @@ class Weather(object):
 
     def next(self):
         state = self.states.__next__()
+        print(f'setting weather to {self.states['name']}')
+
         # self._sun.set_azimuth(state.azimuth) see the comment on alititude in the yaml
         self._sun.set_altitude(state['altitude'])
 
@@ -239,14 +241,17 @@ def main():
         lidar_seg_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
 
         class counter():
-            def __init__(self, value):
+            def __init__(self, value, name = None):
                 self.value = value
+                self.name = name
 
             def increment(self):
+                if self.name:
+                    print(f'{self.name}: {self.value}')
                 self.value += 1
         
         # TODO: do we really need 4 of these?
-        rgb_cam_counter = counter(0)
+        rgb_cam_counter = counter(0, 'rgb_cam')
         rgb_seg_counter = counter(0)
         lidar_cam_counter = counter(0)
         lidar_seg_counter = counter(0)

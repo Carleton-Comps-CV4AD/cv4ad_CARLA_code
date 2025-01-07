@@ -1,5 +1,6 @@
 states:
-  - azimuth: 0 # ignoring this for now because I do not know what reasonable numbers for this are
+  - name: day
+    azimuth: 0 # ignoring this for now because I do not know what reasonable numbers for this are
     altitude: 70
     cloudiness: 0
     precipitation: 0
@@ -8,7 +9,8 @@ states:
     fog_density: 0
     wetness: 0
 
-  - azimuth: 0
+  - name: sunset
+    azimuth: 0
     altitude: 20
     cloudiness: 50
     precipitation: 20
@@ -17,7 +19,8 @@ states:
     fog_density: 20
     wetness: 20
   
-  - azimuth: 0
+  - name: night
+    azimuth: 0
     altitude: -70
     cloudiness: 70
     precipitation: 70
