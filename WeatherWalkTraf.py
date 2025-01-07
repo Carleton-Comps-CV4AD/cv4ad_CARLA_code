@@ -59,16 +59,16 @@ class Weather(object):
             self.states = iter(yaml.safe_load(file)['states'])
 
     def next(self):
-        state = self.states.next()
+        state = self.states.__next__()
         # self._sun.set_azimuth(state.azimuth) see the comment on alititude in the yaml
-        self._sun.set_alititude(state.altitude)
+        self._sun.set_alititude(state['altitude'])
 
-        self.weather.cloudiness = self.clouds
-        self.weather.precipitation = self.rain
-        self.weather.precipitation_deposits = self.puddles
-        self.weather.wind_intensity = self.wind
-        self.weather.fog_density = self.fog
-        self.weather.wetness = self.wetness
+        self.weather.cloudiness = state['cloudiness']
+        self.weather.precipitation = state['precipitation']
+        self.weather.precipitation_deposits = state['precipitation_deposits']
+        self.weather.wind_intensity = state['wind_intensity']
+        self.weather.fog_density = state['fog_density']
+        self.weather.wetness = state['wetness']
         
         self.weather.sun_azimuth_angle = self._sun.azimuth
         self.weather.sun_altitude_angle = self._sun.altitude
@@ -312,16 +312,16 @@ def main():
         t_end = time.time() + 2520
 
         weather = Weather(world.get_weather(), 'weathers.yaml')
-        world.set_weather(weather.weather)
         # while time.time() < t_end:
         while True:
-            world.tick()
-            if rgb_cam_counter.value % 2 > 2:
+            if rgb_cam_counter.value % 2 == 0:
                 try:
                     weather.next()
                 except StopIteration:
                     break
                 world.set_weather(weather.weather)
+
+            world.tick()
 
     finally:
         for camera in ego.cameras: # For some reason, this seems to be necessary evewn though the cameras should be in the actor list, which is destroyed below. Investigate.
