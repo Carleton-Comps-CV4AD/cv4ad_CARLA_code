@@ -13,8 +13,6 @@ import os
 import sys
 import carla # type: ignore <-- what is this
 import random
-import time
-import math
 import math
 import yaml
 
@@ -38,16 +36,16 @@ class Sun(object):
     def __str__(self):
         return 'Sun(alt: %.2f, azm: %.2f)' % (self.altitude, self.azimuth)
 
-
 class Weather(object):
     def __init__(self, weather, configs):
         self.weather = weather
         self._sun = Sun(weather.sun_azimuth_angle, weather.sun_altitude_angle)
         with open(configs, 'r') as file:
-            self.states = iter(yaml.safe_load(file)['states'])
+            self.states = yaml.safe_load(file)['states']
+            self.states_iter = iter(self.states)
 
     def next(self):
-        state = self.states.__next__()
+        state = self.states_iter.__next__()
         print(f"setting weather to", state['name'])
 
         # self._sun.set_azimuth(state.azimuth) see the comment on alititude in the yaml
@@ -64,39 +62,66 @@ class Weather(object):
         self.weather.sun_altitude_angle = self._sun.altitude
 
     def __str__(self):
-        return '%s %s' % (self._sun, self._storm)
+        return '%s %s' % (self._sun)
     
 class Ego_Vehicle():
-    def __init__(self, blueprint, world, spawn_point):
+    def __init__(self, world, blueprint, spawn_points, spawn_point = None):
         self.bp = blueprint
-        self.spawn_point = spawn_point
+        self.spawn_points
+        if spawn_point is None:
+            spawn_point = random.choice(spawn_points)
+        else:
+            spawn_point = spawn_points[spawn_point]
+        
         self.cameras = []
         self.world = world
 
-        # Now we need to give an initial transform to the vehicle. We choose a
-        # random transform from the list of recommended spawn points of the map.
-        transform = spawn_point
-
         # So let's tell the world to spawn the vehicle.
-        self.vehicle = world.spawn_actor(blueprint, transform)
+        self.vehicle = world.spawn_actor(blueprint, spawn_point)
         self.vehicle.set_autopilot(True)
         print('created %s' % self.vehicle.type_id)
 
-    def add_camera(self, blueprint, camera_transform, listen):
-        blueprint.set_attribute('sensor_tick', str(SECONDS_PER_TICK))
-        camera = self.world.spawn_actor(blueprint, camera_transform, attach_to=self.vehicle)
-        camera.listen(listen)
+    def add_camera(self, camera):
+        camera = self.world.spawn_actor(camera.blueprint, camera.transform, attach_to=self.vehicle)
         self.cameras.append(camera)
         print('created %s' % camera.type_id)
 
+    def configure_experiment(self, num_images_per_weather, weathers):
+        for camera in self.cameras:
+            camera.configure_experiment(num_images_per_weather, weathers)
 
-def save_image(image, counter, name, file_type, cc = None):
-    image_path = f'{name}_{counter.value}.{file_type}'
-    if cc:
-        image.save_to_disk(image_path, cc)
-    else:
-        image.save_to_disk(image_path)
-    counter.increment()
+class Camera():
+    def __init__(self, world, blueprint, transform, out_dir, file_type, cc = None):
+        self.blueprint = blueprint
+        self.transform = transform
+        self.counter = 0
+
+        blueprint_library = world.get_blueprint_library()
+        self.camera = blueprint_library.find(blueprint)
+        self.camera.listen(lambda image: self.listen(image))
+        self.transform = carla.Transform(carla.Location(x=1.5, z=2.4))
+
+        blueprint.set_attribute('sensor_tick', str(SECONDS_PER_TICK))
+
+        self.out_dir = out_dir
+        self.file_type = file_type
+        self.cc = cc
+
+    def configure_experiment(self, num_images_per_weather, weathers):
+        self.num_images_per_weather = num_images_per_weather
+        self.weathers = weathers
+    
+    def listen(self, image):
+        weather_name = self.weathers[self.counter // self.num_images_per_weather]
+        image_path = os.path.join(self.out_dir, weather_name, f'{self.counter}.{self.file_type}')
+        if self.cc:
+            image.save_to_disk(image_path, self.cc)
+        else:
+            image.save_to_disk(image_path)
+        self.increment()
+    
+    def increment(self):
+        self.counter += 1
 
 # ! Temporary function to fill the scene with vehicles and pedestrians. We should paratmetrize and organize this so that we can configure the scene easily
 def initialize_agents(world, client, actor_list, traffic_manager, spawn_points):
@@ -182,7 +207,7 @@ def main():
             'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
     except IndexError:
         pass
-    
+
     actor_list = []
     
     try:
@@ -193,6 +218,7 @@ def main():
         # Retrieve the world that is running
         world = client.get_world()
 
+        # Read our weather configurations from yaml and then set the first configuration to be the current weather
         weather = Weather(world.get_weather(), 'weathers.yaml')
         weather.next()
         world.set_weather(weather.weather)
@@ -205,106 +231,30 @@ def main():
 
         traffic_manager = client.get_trafficmanager()
 
-        # The world contains the list of blueprints that we can use for adding new
-        # actors into the simulation.
+        # The world contains the list of blueprints that we can use for adding new actors into the simulation.
         blueprint_library = world.get_blueprint_library()
 
-        bp = random.choice(blueprint_library.filter('cybertruck')) # ? Why do we filter to only one vehicle type and then randomly select one?
+        vehicle_blueprint = random.choice(blueprint_library.filter('vehicle.*.*'))
         spawn_points = world.get_map().get_spawn_points()
-        spawn_point_1 =  spawn_points[32]
+        ego = Ego_Vehicle(world, vehicle_blueprint, spawn_points)
 
-        ego = Ego_Vehicle(bp, world, spawn_point_1)
+        rgb_cam = Camera(world, 'sensor.camera.rgb', carla.Transform(carla.Location(x=1.5, z=2.4)), 
+                         out_dir = '_outRaw', file_type = 'png', cc = carla.ColorConverter.Raw)
+        rgb_seg = Camera(world, 'sensor.camera.semantic_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
+                         out_dir = '_outSeg', file_type = 'png')
+        lidar_cam = Camera(world, 'sensor.lidar.ray_cast', carla.Transform(carla.Location(x=1.5, z=2.4)),
+                           out_dir = '_outLIDAR', file_type = 'ply')
+        lidar_seg = Camera(world, 'sensor.lidar.ray_cast_semantic', carla.Transform(carla.Location(x=1.5, z=2.4)),
+                           out_dir = '_outLIDARseg', file_type = 'ply')
 
-        # Add our cameras
-        #https://github.com/carla-simulator/carla/issues/2176 (bless)
-        rgb_cam = blueprint_library.find('sensor.camera.rgb')
-        rgb_cam_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
-
-        rgb_seg = blueprint_library.find('sensor.camera.semantic_segmentation')
-        rgb_seg_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
-
-        lidar_cam = blueprint_library.find('sensor.lidar.ray_cast')
-        lidar_cam_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
-
-        lidar_seg = blueprint_library.find('sensor.lidar.ray_cast_semantic')
-        lidar_seg_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
-
-        # TODO: There has got to be a better way to do this.
-        class counter():
-            def __init__(self, value, name = None):
-                self.value = value
-                self.name = name
-
-            def increment(self):
-                if self.name:
-                    print(f'{self.name}: {self.value}')
-                self.value += 1
-        
-        # TODO: do we really need 4 of these?
-        rgb_cam_counter = counter(0, 'rgb_cam')
-        rgb_seg_counter = counter(0)
-        lidar_cam_counter = counter(0)
-        lidar_seg_counter = counter(0)
-
-        # Now we register the function that will be called each time the sensor receives an image.
-        cc = carla.ColorConverter.Raw
-        rgb_cam_listen = lambda image: save_image(image, counter = rgb_cam_counter, 
-                        name = '_outRaw/raw', file_type = 'png', cc = cc)
-        
-        rgb_seg_listen = lambda image: save_image(image, counter = rgb_seg_counter, 
-                        name = '_outSeg/seg', file_type = 'png')
-
-        lidar_cam_listen = lambda image: save_image(image, counter = lidar_cam_counter, 
-                        name = '_outLIDAR/raw', file_type = 'ply')
-
-        lidar_seg_listen = lambda image: save_image(image, counter = lidar_seg_counter, 
-                        name = '_outLIDARseg/seg', file_type = 'ply')
-
-        ego.add_camera(rgb_cam, rgb_cam_transform, rgb_cam_listen)
-        ego.add_camera(rgb_seg, rgb_seg_transform, rgb_seg_listen)
-        ego.add_camera(lidar_cam, lidar_cam_transform, lidar_cam_listen)
-        ego.add_camera(lidar_seg, lidar_seg_transform, lidar_seg_listen)
+        ego.add_camera(rgb_cam)
+        ego.add_camera(rgb_seg)
+        ego.add_camera(lidar_cam)
+        ego.add_camera(lidar_seg)
 
         # Store so we can delete later. Actors do not get removed automatically
         actor_list.append(ego.vehicle)
         actor_list.extend(ego.cameras)
-
-        # *** Unclear if this needs to stay. We may want randomization in the future to improve the resilience of our model.
-
-        # A blueprint contains the list of attributes that define a vehicle's
-        # instance, we can read them and modify some of them. For instance,
-        # let's randomize its color.
-        # if bp.has_attribute('color'):
-        #     color = random.choice(bp.get_attribute('color').recommended_values)
-        #     bp.set_attribute('color', color)
-
-        # Route 1
-        # Create route 1 from the chosen spawn points
-        # route_1_indices = [17, 70, 130, 29, 79, 101, 55, 57, 119, 59, 112, 32]
-        # route_1 = []
-        # for ind in route_1_indices:
-        #     route_1.append(spawn_points[ind].location)
-
-        # traffic_manager.set_path(vehicle, route_1)
-
-        # # But the city now is probably quite empty, let's add a few more
-        # # vehicles.
-        # transform.location += carla.Location(x=40, y=-3.2)
-        # transform.rotation.yaw = -180.0
-        # for _ in range(0, 10):
-        #     transform.location.x += 8.0
-
-        #     bp = random.choice(blueprint_library.filter('vehicle'))
-
-        #     # This time we are using try_spawn_actor. If the spot is already
-        #     # occupied by another object, the function will return None.
-        #     npc = world.try_spawn_actor(bp, transform)
-        #     if npc is not None:
-        #         actor_list.append(npc)
-        #         npc.set_autopilot(True)
-        #         print('created %s' % npc.type_id)
-
-        # *** 
 
         vehicles = initialize_agents(world, client, actor_list, traffic_manager, spawn_points)
 
@@ -314,11 +264,12 @@ def main():
 
         # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200. Leave at 2 for testing.
         num_images_per_weather = 2
+        ego.configure_experiment(num_images_per_weather, weather.states)
 
         last_value = 0
         while True:
-            if rgb_cam_counter.value != last_value and rgb_cam_counter.value % num_images_per_weather == 0:
-                last_value = rgb_cam_counter.value
+            if ego.cameras[0].counter.value != last_value and ego.cameras[0].counter.value % num_images_per_weather == 0:
+                last_value = ego.cameras[0].counter.value
                 try:
                     weather.next()
                 except StopIteration:
