@@ -101,11 +101,13 @@ class Ego_Vehicle():
         current_lights |= carla.VehicleLightState.HighBeam
         # current_lights |= carla.VehicleLightState.Position
         self.vehicle.set_light_state(carla.VehicleLightState(current_lights))
+        self.vehicle.set_autopilot(True)
 
     def lights_off(self):
         print("turning off lights")
         current_lights = carla.VehicleLightState.NONE
         self.vehicle.set_light_state(carla.VehicleLightState(current_lights))
+        self.vehicle.set_autopilot(True)
 
 class Camera():
     def __init__(self, world, sensor_queue, blueprint, transform, out_dir, file_type, cc = None):
@@ -228,7 +230,7 @@ def initialize_agents(world, client, actor_list, spawn_points):
 
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
-    num_images_per_weather = 10
+    num_images_per_weather = 500
     
     try:
         sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
