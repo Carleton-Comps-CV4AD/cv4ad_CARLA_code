@@ -67,7 +67,7 @@ class Weather(object):
 class Ego_Vehicle():
     def __init__(self, world, blueprint, spawn_points, spawn_point = None):
         self.bp = blueprint
-        self.spawn_points
+        self.spawn_points = spawn_points
         if spawn_point is None:
             spawn_point = random.choice(spawn_points)
         else:
