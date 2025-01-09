@@ -19,10 +19,10 @@ states:
     fog_density: 0
     wetness: 10
   
-  - name: night
+  - name: random
     azimuth: 0
-    altitude: -70
-    cloudiness: 70
+    altitude: 50
+    cloudiness: 20
     precipitation: 70
     precipitation_deposits: 70
     wind_intensity: 70

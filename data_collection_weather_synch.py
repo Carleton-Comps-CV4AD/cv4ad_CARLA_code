@@ -95,10 +95,11 @@ class Ego_Vehicle():
             camera.configure_experiment(num_images_per_weather, weathers)
 
 class Camera():
-    def __init__(self, world, blueprint, transform, out_dir, file_type, cc = None):
+    def __init__(self, world, sensor_queue, blueprint, transform, out_dir, file_type, cc = None):
         self.blueprint = blueprint
         self.transform = transform
         self.counter = 0
+        self.sensor_queue = sensor_queue
 
         blueprint_library = world.get_blueprint_library()
         self.camera = blueprint_library.find(blueprint)
@@ -109,6 +110,8 @@ class Camera():
         self.out_dir = out_dir
         self.file_type = file_type
         self.cc = cc
+
+        self.has_new_image = False
 
     def configure_experiment(self, num_images_per_weather, weathers):
         self.num_images_per_weather = num_images_per_weather
@@ -122,6 +125,9 @@ class Camera():
         else:
             image.save_to_disk(image_path)
         self.increment()
+        self.sensor_queue.put((image.frame, self.blueprint))
+
+        self.has_new_image = True
     
     def increment(self):
         self.counter += 1
@@ -130,8 +136,9 @@ class Camera():
         self.camera_actor.destroy()
 
 # ! Temporary function to fill the scene with vehicles and pedestrians. We should paratmetrize and organize this so that we can configure the scene easily
-def initialize_agents(world, client, actor_list, traffic_manager, spawn_points):
+def initialize_agents(world, client, actor_list, spawn_points):
     traffic_manager = client.get_trafficmanager()
+    traffic_manager.set_synchronous_mode(True)
     # Select some models from the blueprint library
     models = ['dodge', 'audi', 'model3', 'mini', 'mustang', 'lincoln', 'prius', 'nissan', 'crown', 'impala']
     blueprints = []
@@ -151,9 +158,9 @@ def initialize_agents(world, client, actor_list, traffic_manager, spawn_points):
 
     for v in vehicles:
         v.set_autopilot(True) 
-        traffic_manager.random_left_lanechange_percentage(v, 10)
-        traffic_manager.random_right_lanechange_percentage(v, 10)
-        traffic_manager.auto_lane_change(v, True)  
+        traffic_manager.random_left_lanechange_percentage(v, 0)
+        traffic_manager.random_right_lanechange_percentage(v, 0)
+        traffic_manager.auto_lane_change(v, False)  
     
     # Spawn walkers
     blueprint_library = world.get_blueprint_library()
@@ -208,7 +215,7 @@ def initialize_agents(world, client, actor_list, traffic_manager, spawn_points):
 
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
-    num_images_per_weather = 2
+    num_images_per_weather = 50
     
     try:
         sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -231,7 +238,7 @@ def main():
         settings = world.get_settings()
 
         # Set CARLA syncronous mode
-        settings.fixed_delta_seconds = 0.2
+        settings.fixed_delta_seconds = 0.1
         settings.synchronous_mode = True
         world.apply_settings(settings)
 
@@ -255,13 +262,13 @@ def main():
         spawn_points = world.get_map().get_spawn_points()
         ego = Ego_Vehicle(world, vehicle_blueprint, spawn_points)
 
-        rgb_cam = Camera(world, 'sensor.camera.rgb', carla.Transform(carla.Location(x=1.5, z=2.4)), 
+        rgb_cam = Camera(world, sensor_queue, 'sensor.camera.rgb', carla.Transform(carla.Location(x=1.5, z=2.4)), 
                          out_dir = '_outRaw', file_type = 'png', cc = carla.ColorConverter.Raw)
-        rgb_seg = Camera(world, 'sensor.camera.semantic_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
+        rgb_seg = Camera(world, sensor_queue, 'sensor.camera.semantic_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
                          out_dir = '_outSeg', file_type = 'png')
-        lidar_cam = Camera(world, 'sensor.lidar.ray_cast', carla.Transform(carla.Location(x=1.5, z=2.4)),
+        lidar_cam = Camera(world, sensor_queue, 'sensor.lidar.ray_cast', carla.Transform(carla.Location(x=1.5, z=2.4)),
                            out_dir = '_outLIDAR', file_type = 'ply')
-        lidar_seg = Camera(world, 'sensor.lidar.ray_cast_semantic', carla.Transform(carla.Location(x=1.5, z=2.4)),
+        lidar_seg = Camera(world, sensor_queue, 'sensor.lidar.ray_cast_semantic', carla.Transform(carla.Location(x=1.5, z=2.4)),
                            out_dir = '_outLIDARseg', file_type = 'ply')
 
         ego.add_camera(rgb_cam)
@@ -289,15 +296,17 @@ def main():
 
             world.tick()
 
-            try:
-                for _ in range(len(ego.cameras)):
-                    s_frame = sensor_queue.get(True, 1.0)
-                    print("    Frame: %d   Sensor: %s" % (s_frame[0], s_frame[1]))
-
-            except Empty:
-                print("    Some of the sensor information is missed")
+            if ego.cameras[0].has_new_image:
+                try:
+                    for _ in range(len(ego.cameras)):
+                        s_frame = sensor_queue.get(True, 1.0)
+                        print("    Frame: %d   Sensor: %s" % (s_frame[0], s_frame[1]))
+                except Empty:
+                    print("    Some of the sensor information is missed")
+                ego.cameras[0].has_new_image = False
 
     finally:
+        world.apply_settings(original_settings)
         # These cameras are our camera objects so they need to destroy themselves
         for camera in ego.cameras:
             camera.destroy()
@@ -305,7 +314,6 @@ def main():
         print('destroying actors')
         client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
         client.apply_batch([carla.command.DestroyActor(x) for x in vehicles]) # Why is this separate from the actor list above?
-        world.apply_settings(original_settings)
         print('done.')
 
 
