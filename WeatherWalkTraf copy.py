@@ -82,9 +82,11 @@ class Ego_Vehicle():
         print('created %s' % self.vehicle.type_id)
 
     def add_camera(self, camera):
-        camera = self.world.spawn_actor(camera.blueprint, camera.transform, attach_to=self.vehicle)
+        camera_actor = self.world.spawn_actor(camera.camera, camera.transform, attach_to=self.vehicle)
+        camera.camera_actor = camera_actor
+        camera_actor.listen(lambda image: camera.listen(image))
         self.cameras.append(camera)
-        print('created %s' % camera.type_id)
+        print('created %s' % camera.blueprint)
 
     def configure_experiment(self, num_images_per_weather, weathers):
         for camera in self.cameras:
@@ -98,10 +100,9 @@ class Camera():
 
         blueprint_library = world.get_blueprint_library()
         self.camera = blueprint_library.find(blueprint)
-        self.camera.listen(lambda image: self.listen(image))
         self.transform = carla.Transform(carla.Location(x=1.5, z=2.4))
 
-        blueprint.set_attribute('sensor_tick', str(SECONDS_PER_TICK))
+        self.camera.set_attribute('sensor_tick', str(SECONDS_PER_TICK))
 
         self.out_dir = out_dir
         self.file_type = file_type
@@ -113,7 +114,7 @@ class Camera():
     
     def listen(self, image):
         weather_name = self.weathers[self.counter // self.num_images_per_weather]
-        image_path = os.path.join(self.out_dir, weather_name, f'{self.counter}.{self.file_type}')
+        image_path = os.path.join(weather_name, self.out_dir, f'{self.counter}.{self.file_type}')
         if self.cc:
             image.save_to_disk(image_path, self.cc)
         else:
@@ -122,6 +123,9 @@ class Camera():
     
     def increment(self):
         self.counter += 1
+
+    def destroy(self):
+        self.camera_actor.destroy()
 
 # ! Temporary function to fill the scene with vehicles and pedestrians. We should paratmetrize and organize this so that we can configure the scene easily
 def initialize_agents(world, client, actor_list, traffic_manager, spawn_points):
@@ -200,6 +204,9 @@ def initialize_agents(world, client, actor_list, traffic_manager, spawn_points):
     return vehicles
 
 def main():
+    # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200. Leave at 2 for testing.
+    num_images_per_weather = 2
+    
     try:
         sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
             sys.version_info.major,
@@ -251,25 +258,17 @@ def main():
         ego.add_camera(rgb_seg)
         ego.add_camera(lidar_cam)
         ego.add_camera(lidar_seg)
+        ego.configure_experiment(num_images_per_weather, [state['name'] for state in weather.states])
 
         # Store so we can delete later. Actors do not get removed automatically
         actor_list.append(ego.vehicle)
-        actor_list.extend(ego.cameras)
 
         vehicles = initialize_agents(world, client, actor_list, traffic_manager, spawn_points)
 
-        # * This can probably go as well, since we now terminate after collecting n images, rather than after a certain amount of time.
-        # t_end = time.time() + 2520
-        # while time.time() < t_end:
-
-        # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200. Leave at 2 for testing.
-        num_images_per_weather = 2
-        ego.configure_experiment(num_images_per_weather, weather.states)
-
         last_value = 0
         while True:
-            if ego.cameras[0].counter.value != last_value and ego.cameras[0].counter.value % num_images_per_weather == 0:
-                last_value = ego.cameras[0].counter.value
+            if ego.cameras[0].counter != last_value and ego.cameras[0].counter % num_images_per_weather == 0:
+                last_value = ego.cameras[0].counter
                 try:
                     weather.next()
                 except StopIteration:
