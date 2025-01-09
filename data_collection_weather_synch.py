@@ -94,6 +94,19 @@ class Ego_Vehicle():
         for camera in self.cameras:
             camera.configure_experiment(num_images_per_weather, weathers)
 
+    def lights_on(self):
+        print("turning on lights")
+        current_lights = carla.VehicleLightState.NONE
+        # current_lights |= carla.VehicleLightState.LowBeam
+        current_lights |= carla.VehicleLightState.HighBeam
+        # current_lights |= carla.VehicleLightState.Position
+        self.vehicle.set_light_state(carla.VehicleLightState(current_lights))
+
+    def lights_off(self):
+        print("turning off lights")
+        current_lights = carla.VehicleLightState.NONE
+        self.vehicle.set_light_state(carla.VehicleLightState(current_lights))
+
 class Camera():
     def __init__(self, world, sensor_queue, blueprint, transform, out_dir, file_type, cc = None):
         self.blueprint = blueprint
@@ -147,7 +160,7 @@ def initialize_agents(world, client, actor_list, spawn_points):
             blueprints.append(v)
 
     # Set a max number of vehicles and prepare a list for those we spawn
-    max_vehicles = 20
+    max_vehicles = 25
     max_vehicles = min([max_vehicles, len(spawn_points)])
     vehicles = []
     
@@ -158,9 +171,9 @@ def initialize_agents(world, client, actor_list, spawn_points):
 
     for v in vehicles:
         v.set_autopilot(True) 
-        traffic_manager.random_left_lanechange_percentage(v, 0)
-        traffic_manager.random_right_lanechange_percentage(v, 0)
-        traffic_manager.auto_lane_change(v, False)  
+        traffic_manager.random_left_lanechange_percentage(v, .1)
+        traffic_manager.random_right_lanechange_percentage(v, .1)
+        traffic_manager.auto_lane_change(v, True)  
     
     # Spawn walkers
     blueprint_library = world.get_blueprint_library()
@@ -215,7 +228,7 @@ def initialize_agents(world, client, actor_list, spawn_points):
 
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
-    num_images_per_weather = 50
+    num_images_per_weather = 10
     
     try:
         sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -246,8 +259,6 @@ def main():
 
         # Read our weather configurations from yaml and then set the first configuration to be the current weather
         weather = Weather(world.get_weather(), 'weathers.yaml')
-        weather.next()
-        world.set_weather(weather.weather)
 
         # TODO: This is broken. We should figure out how to simulate faster to save some time on our data generation.
         # Change some world setting to make things faster
@@ -282,16 +293,23 @@ def main():
 
         vehicles = initialize_agents(world, client, actor_list, spawn_points)
 
-        last_value = 0
+        last_value = -1
         while True:
 
             # Try and progress the weather to the next state if we have taken enough images for the current weather
             if ego.cameras[0].counter != last_value and ego.cameras[0].counter % num_images_per_weather == 0:
                 last_value = ego.cameras[0].counter
+                # for camera in ego.cameras:
+                #     camera.counter = 0
                 try:
                     weather.next()
                 except StopIteration:
                     break
+
+                if weather._sun.altitude < 15:
+                    ego.lights_on()
+                else:
+                    ego.lights_off()
                 world.set_weather(weather.weather)
 
             world.tick()

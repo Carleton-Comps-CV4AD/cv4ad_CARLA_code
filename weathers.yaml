@@ -1,30 +1,30 @@
 states:
-  - name: day
-    azimuth: 0 # ignoring this for now because I do not know what reasonable numbers for this are
-    altitude: 70
-    cloudiness: 0
-    precipitation: 0
-    precipitation_deposits: 0
-    wind_intensity: 0
-    fog_density: 0
-    wetness: 0
-
-  - name: sunset
+  - name: foggy night
     azimuth: 0
-    altitude: 10
-    cloudiness: 10
+    altitude: -30
+    cloudiness: 20
     precipitation: 10
-    precipitation_deposits: 10
+    precipitation_deposits: 30
     wind_intensity: 10
-    fog_density: 0
-    wetness: 10
-  
-  - name: random
+    fog_density: 30
+    wetness: 50
+
+  - name: day
     azimuth: 0
     altitude: 50
     cloudiness: 20
-    precipitation: 70
-    precipitation_deposits: 70
-    wind_intensity: 70
-    fog_density: 70
-    wetness: 70
+    precipitation: 10
+    precipitation_deposits: 30
+    wind_intensity: 10
+    fog_density: 30
+    wetness: 50
+
+  - name: rainy night
+    azimuth: 0
+    altitude: -30
+    cloudiness: 20
+    precipitation: 60
+    precipitation_deposits: 30
+    wind_intensity: 10
+    fog_density: 30
+    wetness: 50
