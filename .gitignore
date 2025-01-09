@@ -1,0 +1,7 @@
+*.png
+*.ply
+
+_outLIDAR/
+_outLIDARseg/
+_outRaw/
+_outSeg/
