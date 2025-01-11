@@ -97,9 +97,9 @@ class Ego_Vehicle():
     def lights_on(self):
         print("turning on lights")
         current_lights = carla.VehicleLightState.NONE
-        # current_lights |= carla.VehicleLightState.LowBeam
-        current_lights |= carla.VehicleLightState.HighBeam
-        # current_lights |= carla.VehicleLightState.Position
+        current_lights |= carla.VehicleLightState.LowBeam
+        # current_lights |= carla.VehicleLightState.HighBeam
+        current_lights |= carla.VehicleLightState.Position
         self.vehicle.set_light_state(carla.VehicleLightState(current_lights))
         self.vehicle.set_autopilot(True)
 
@@ -261,12 +261,6 @@ def main():
 
         # Read our weather configurations from yaml and then set the first configuration to be the current weather
         weather = Weather(world.get_weather(), 'weathers.yaml')
-
-        # TODO: This is broken. We should figure out how to simulate faster to save some time on our data generation.
-        # Change some world setting to make things faster
-        # settings = world.get_settings()
-        # settings.fixed_delta_seconds = 0.05
-        # world.apply_settings(settings)
 
         # The world contains the list of blueprints that we can use for adding new actors into the simulation.
         blueprint_library = world.get_blueprint_library()
