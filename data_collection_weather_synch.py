@@ -230,7 +230,7 @@ def initialize_agents(world, client, actor_list, spawn_points):
 
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
-    num_images_per_weather = 500
+    num_images_per_weather = 1000
     
     try:
         sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
