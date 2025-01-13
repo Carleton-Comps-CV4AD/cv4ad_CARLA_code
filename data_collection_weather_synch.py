@@ -14,6 +14,7 @@ import sys
 import carla # type: ignore <-- what is this
 import random
 import math
+import time
 import yaml
 from queue import Queue
 from queue import Empty
@@ -299,6 +300,7 @@ def main():
                 #     camera.counter = 0
                 try:
                     weather.next()
+                    time.sleep(1)
                 except StopIteration:
                     break
 
