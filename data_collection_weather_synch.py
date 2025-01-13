@@ -227,11 +227,12 @@ def initialize_agents(world, client, actor_list, spawn_points):
     actor_list.extend(walker_actors)
     actor_list.extend(controller_actors)
 
-    return vehicles
+    return vehicles, walker_actors
 
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
-    num_images_per_weather = 1000
+    num_images_per_weather = 50
+    weather_config = 'six_weathers.yaml'
     
     try:
         sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -261,7 +262,7 @@ def main():
         sensor_queue = Queue()
 
         # Read our weather configurations from yaml and then set the first configuration to be the current weather
-        weather = Weather(world.get_weather(), 'weathers.yaml')
+        weather = Weather(world.get_weather(), weather_config)
 
         # The world contains the list of blueprints that we can use for adding new actors into the simulation.
         blueprint_library = world.get_blueprint_library()
@@ -288,7 +289,7 @@ def main():
         # Store so we can delete later. Actors do not get removed automatically
         actor_list.append(ego.vehicle)
 
-        vehicles = initialize_agents(world, client, actor_list, spawn_points)
+        vehicles, walkers = initialize_agents(world, client, actor_list, spawn_points)
 
         last_value = -1
         while True:
@@ -300,6 +301,8 @@ def main():
                 #     camera.counter = 0
                 try:
                     weather.next()
+                    for walker in walkers:
+                        print(walker.is_alive)
                     time.sleep(1)
                 except StopIteration:
                     break
@@ -316,7 +319,7 @@ def main():
                 try:
                     for _ in range(len(ego.cameras)):
                         s_frame = sensor_queue.get(True, 1.0)
-                        print("    Frame: %d   Sensor: %s" % (s_frame[0], s_frame[1]))
+                        # print("    Frame: %d   Sensor: %s" % (s_frame[0], s_frame[1]))
                 except Empty:
                     print("    Some of the sensor information is missed")
                 ego.cameras[0].has_new_image = False

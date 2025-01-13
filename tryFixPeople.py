@@ -292,7 +292,7 @@ def initialize_a_w(world, client, actor_listw, spawn_points):
     actor_listw.extend(walker_actors)
     actor_listw.extend(controller_actors)
 
-    return walkers
+    return walker_actors
 
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
