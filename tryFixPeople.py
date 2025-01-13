@@ -152,7 +152,8 @@ class Camera():
         self.camera_actor.destroy()
 
 # ! Temporary function to fill the scene with vehicles and pedestrians. We should paratmetrize and organize this so that we can configure the scene easily
-def initialize_v(world, client, actor_list, spawn_points):
+def initialize_Cars(world, client, actor_list, spawn_points, number):
+    #* spawns vechiles in our world, number decides how many cars to spawn.
     traffic_manager = client.get_trafficmanager()
     traffic_manager.set_synchronous_mode(True)
     # Select some models from the blueprint library
@@ -163,7 +164,7 @@ def initialize_v(world, client, actor_list, spawn_points):
             blueprints.append(v)
 
     # Set a max number of vehicles and prepare a list for those we spawn
-    max_vehicles = 30
+    max_vehicles = number
     max_vehicles = min([max_vehicles, len(spawn_points)])
     vehicles = []
     
@@ -180,8 +181,8 @@ def initialize_v(world, client, actor_list, spawn_points):
     
     return vehicles
 
-def initialize_w(world, client, actor_listw, spawn_points):
-    # Spawn walkers
+def initialize_Walkers(world, client, actor_listw, spawn_points, number):
+    #* Spawn walkers, held in sperate walker lists to keep track of them, number tells program how many to try to spawn
     blueprint_library = world.get_blueprint_library()
     walker_bp = blueprint_library.filter('walker.pedestrian.*')
     walker_controller_bp = blueprint_library.find('controller.ai.walker')
@@ -190,7 +191,7 @@ def initialize_w(world, client, actor_listw, spawn_points):
     controllers = []
 
     spawn_points = []
-    for i in range(10):
+    for i in range(number):
         spawn_point = carla.Transform()
         spawn_point.location = world.get_random_location_from_navigation()
         if spawn_point.location is not None:
@@ -235,10 +236,10 @@ def initialize_w(world, client, actor_listw, spawn_points):
     actor_listw.extend(walker_actors)
     actor_listw.extend(controller_actors)
 
-    return walkers
+    return walker_actors
 
-def initialize_a_w(world, client, actor_listw, spawn_points):
-    # Spawn walkers
+def initialize_OneWalker(world, client, actor_listw, spawn_points):
+     #* Spawns only 1 walker (doing this bc spawning in batches fails a few times, hence if we put 50 people we sometimes get 46 idk why)
     blueprint_library = world.get_blueprint_library()
     walker_bp = blueprint_library.filter('walker.pedestrian.*')
     walker_controller_bp = blueprint_library.find('controller.ai.walker')
@@ -285,14 +286,28 @@ def initialize_a_w(world, client, actor_listw, spawn_points):
         controller.go_to_location(world.get_random_location_from_navigation())
         controller.set_max_speed(random.uniform(1.0, 3.0))  # Random speeds
 
-
-
-    print(f"Spawned {len(walkers)} walkers.")
+    print(f"Missing Walker Spawned.")
 
     actor_listw.extend(walker_actors)
     actor_listw.extend(controller_actors)
 
     return walkers
+
+
+def numberOfDeadWalkers(number, walkerList):
+    #* Checks how many people are active and find difference from our total started
+    # for w in walkerList:
+    #     print(w.is_alive)
+    difference = 0
+    counter = 0
+    for w in walkerList:
+        if w.is_active == True:
+            counter += 1
+    print("How many Active: ", counter, "\n")
+    difference = number - counter
+    if difference != 0:
+        print("difference is", difference)
+    return difference
 
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
@@ -315,14 +330,17 @@ def main():
         client.set_timeout(10.0)
 
         # Retrieve the world that is running
+        # world = client.load_world('Town10HD')
         world = client.get_world()
+        
         original_settings = world.get_settings()
         settings = world.get_settings()
-
+    
         # Set CARLA syncronous mode
         settings.fixed_delta_seconds = 0.1
         settings.synchronous_mode = True
         world.apply_settings(settings)
+        
 
         sensor_queue = Queue()
 
@@ -354,12 +372,15 @@ def main():
         # Store so we can delete later. Actors do not get removed automatically
         actor_list.append(ego.vehicle)
 
-        vehicles = initialize_v(world, client, actor_list, spawn_points)
-        walkers = initialize_w(world, client, actor_listw, spawn_points)
+        vehicles = initialize_Cars(world, client, actor_list, spawn_points, 25)
+        walkers = initialize_Walkers(world, client, actor_listw, spawn_points, 50)
         
 
         last_value = -1
-        print("printing walkers", walkers)
+        startingWalkers = len(walkers)
+        print("STARTING NUMBER OF WALKERS: ",startingWalkers, "\n")
+
+        stopCheckingDeadpPeople = False
         while True:
 
             # Try and progress the weather to the next state if we have taken enough images for the current weather
@@ -370,8 +391,7 @@ def main():
                 try:
                     weather.next()
                     time.sleep(1)
-                    for w in walkers:
-                        print(w.is_alive)
+                    
                     
                 except StopIteration:
                     break
@@ -381,7 +401,19 @@ def main():
                 else:
                     ego.lights_off()
                 world.set_weather(weather.weather)
+            
+            if ego.cameras[0].counter % 5 == 0 and stopCheckingDeadpPeople == False:
+                peopleCount = len(walkers)
+                dif = numberOfDeadWalkers(startingWalkers, walkers)
+                while dif != 0:
+                    initialize_OneWalker(world, client, actor_listw, spawn_points)
+                    dif -= 1
 
+                peopleCount = len(walkers)
+                print("\n")
+                print("people count: ", peopleCount, "\n")
+                stopCheckingDeadpPeople = True
+        
 
             world.tick()
 
@@ -393,6 +425,7 @@ def main():
                 except Empty:
                     print("    Some of the sensor information is missed")
                 ego.cameras[0].has_new_image = False
+                stopCheckingDeadpPeople = False
 
 
             
