@@ -294,24 +294,26 @@ def initialize_OneWalker(world, client, actor_listw, spawn_points):
     return walkers
 
 
-def numberOfDeadWalkers(number, walkerList):
+def numberOfDeadWalkers(numberMAX, walkerList):
     #* Checks how many people are active and find difference from our total started
     # for w in walkerList:
     #     print(w.is_alive)
     difference = 0
-    counter = 0
+    unactiveCounter = 0
     for w in walkerList:
-        if w.is_active == True:
-            counter += 1
-    print("How many Active: ", counter, "\n")
-    difference = number - counter
+        if w.is_active == False:
+            carla.command.DestroyActor(w)
+            unactiveCounter += 1
+            
+    print("How many unActive: ", unactiveCounter, "\n")
+    difference = numberMAX - unactiveCounter
     if difference != 0:
-        print("difference is", difference)
-    return difference
+        print("Actives are: ", difference)
+    return unactiveCounter
 
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
-    num_images_per_weather = 20
+    num_images_per_weather = 1250
     
     try:
         sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -372,13 +374,17 @@ def main():
         # Store so we can delete later. Actors do not get removed automatically
         actor_list.append(ego.vehicle)
 
-        vehicles = initialize_Cars(world, client, actor_list, spawn_points, 25)
-        walkers = initialize_Walkers(world, client, actor_listw, spawn_points, 50)
+
+
+
+        #* CHANGE PARAMETERS
+        vehicles = initialize_Cars(world, client, actor_list, spawn_points, 35)
+        walkers = initialize_Walkers(world, client, actor_listw, spawn_points, 40)
         
 
         last_value = -1
         startingWalkers = len(walkers)
-        print("STARTING NUMBER OF WALKERS: ",startingWalkers, "\n")
+        print("STARTING NUMBER OF W0ALKERS: ",startingWalkers, "\n")
 
         stopCheckingDeadpPeople = False
         while True:
@@ -402,12 +408,12 @@ def main():
                     ego.lights_off()
                 world.set_weather(weather.weather)
             
-            if ego.cameras[0].counter % 5 == 0 and stopCheckingDeadpPeople == False:
+            if ego.cameras[0].counter % 15 == 0 and stopCheckingDeadpPeople == False:
                 peopleCount = len(walkers)
-                dif = numberOfDeadWalkers(startingWalkers, walkers)
-                while dif != 0:
-                    initialize_OneWalker(world, client, actor_listw, spawn_points)
-                    dif -= 1
+                dif = numberOfDeadWalkers(startingWalkers, actor_listw)
+                if dif != 0:
+                    initialize_Walkers(world, client, actor_listw, spawn_points, dif)
+                    dif = 0
 
                 peopleCount = len(walkers)
                 print("\n")
