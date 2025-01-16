@@ -1,10 +1,10 @@
 states:
   - name: test_day
     azimuth: 0
-    altitude: 70
-    cloudiness: 70
-    precipitation: 70
-    precipitation_deposits: 70
+    altitude: 50
+    cloudiness: 0
+    precipitation: 0
+    precipitation_deposits: 0
     wind_intensity: 0
     fog_density: 0
-    wetness: 70
+    wetness: 0

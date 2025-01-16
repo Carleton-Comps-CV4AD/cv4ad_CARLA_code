@@ -132,6 +132,10 @@ class Camera():
     def configure_experiment(self, num_images_per_weather, weathers):
         self.num_images_per_weather = num_images_per_weather
         self.weathers = weathers
+
+    def set_image_size(self, x = '1920', y = '1080'):
+        self.camera.set_attribute('image_size_x', x)
+        self.camera.set_attribute('image_size_y', y)
     
     def listen(self, image):
         weather_name = self.weathers[self.counter // self.num_images_per_weather]
@@ -232,7 +236,7 @@ def initialize_agents(world, client, actor_list, spawn_points):
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
     num_images_per_weather = 50
-    weather_config = 'six_weathers.yaml'
+    weather_config = 'weathers.yaml'
     
     try:
         sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -273,8 +277,10 @@ def main():
 
         rgb_cam = Camera(world, sensor_queue, 'sensor.camera.rgb', carla.Transform(carla.Location(x=1.5, z=2.4)), 
                          out_dir = '_outRaw', file_type = 'png', cc = carla.ColorConverter.Raw)
+        rgb_cam.set_image_size()
         rgb_seg = Camera(world, sensor_queue, 'sensor.camera.semantic_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
                          out_dir = '_outSeg', file_type = 'png')
+        rgb_seg.set_image_size()
         lidar_cam = Camera(world, sensor_queue, 'sensor.lidar.ray_cast', carla.Transform(carla.Location(x=1.5, z=2.4)),
                            out_dir = '_outLIDAR', file_type = 'ply')
         lidar_seg = Camera(world, sensor_queue, 'sensor.lidar.ray_cast_semantic', carla.Transform(carla.Location(x=1.5, z=2.4)),

@@ -21,6 +21,7 @@ from queue import Empty
 
 # Global configuration
 SECONDS_PER_TICK = 5.0 # seconds per tick
+DEBUG = False
 
 #WEATHER STUFF
 
@@ -300,10 +301,18 @@ def numberOfDeadWalkers(numberMAX, walkerList):
     #     print(w.is_alive)
     difference = 0
     unactiveCounter = 0
+
+    destroyed = []
     for w in walkerList:
         if w.is_active == False:
             carla.command.DestroyActor(w)
+            destroyed.append(w)
             unactiveCounter += 1
+
+    for w in destroyed:
+        walkerList.remove(w)
+
+    print("walker list length after pruning dead:", len(walkerList))
             
     print("How many unActive: ", unactiveCounter, "\n")
     difference = numberMAX - unactiveCounter
@@ -313,7 +322,7 @@ def numberOfDeadWalkers(numberMAX, walkerList):
 
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
-    num_images_per_weather = 1250
+    num_images_per_weather = 200
     
     try:
         sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -379,12 +388,12 @@ def main():
 
         #* CHANGE PARAMETERS
         vehicles = initialize_Cars(world, client, actor_list, spawn_points, 35)
-        walkers = initialize_Walkers(world, client, actor_listw, spawn_points, 40)
+        walkers = initialize_Walkers(world, client, actor_listw, spawn_points, 80)
         
 
         last_value = -1
         startingWalkers = len(walkers)
-        print("STARTING NUMBER OF W0ALKERS: ",startingWalkers, "\n")
+        print("STARTING NUMBER OF WALKERS: ",startingWalkers, "\n")
 
         stopCheckingDeadpPeople = False
         while True:
@@ -427,7 +436,9 @@ def main():
                 try:
                     for _ in range(len(ego.cameras)):
                         s_frame = sensor_queue.get(True, 1.0)
-                        print("    Frame: %d   Sensor: %s" % (s_frame[0], s_frame[1]))
+
+                        if DEBUG:
+                            print("    Frame: %d   Sensor: %s" % (s_frame[0], s_frame[1]))
                 except Empty:
                     print("    Some of the sensor information is missed")
                 ego.cameras[0].has_new_image = False
