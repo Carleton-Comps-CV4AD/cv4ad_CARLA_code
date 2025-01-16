@@ -9,46 +9,6 @@ states:
     fog_density: 0
     wetness: 0
 
-  - name: clear_night
-    azimuth: 0
-    altitude: -70
-    cloudiness: 0
-    precipitation: 0
-    precipitation_deposits: 0
-    wind_intensity: 0
-    fog_density: 0
-    wetness: 0
-  
-  - name: clear_sunset
-    azimuth: 0
-    altitude: 10
-    cloudiness: 0
-    precipitation: 0
-    precipitation_deposits: 0
-    wind_intensity: 0
-    fog_density: 0
-    wetness: 0
-
-  - name: clear_wet_day
-    azimuth: 0
-    altitude: 70
-    cloudiness: 0
-    precipitation: 0
-    precipitation_deposits: 70
-    wind_intensity: 0
-    fog_density: 0
-    wetness: 70
-
-  - name: rainy_day
-    azimuth: 0
-    altitude: 70
-    cloudiness: 50
-    precipitation: 70
-    precipitation_deposits: 70
-    wind_intensity: 0
-    fog_density: 0
-    wetness: 70
-
   - name: foggy_day
     azimuth: 0
     altitude: 70

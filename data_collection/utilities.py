@@ -22,14 +22,15 @@ class Weather(object):
     def __init__(self, weather, configs):
         self.weather = weather
         self._sun = Sun(weather.sun_azimuth_angle, weather.sun_altitude_angle)
+
         with open(configs, 'r') as file:
             self.states = yaml.safe_load(file)['states']
             self.states_iter = iter(self.states)
 
-    def next(self):
-        state = self.states_iter.__next__()
-        print(f"setting weather to", state['name'])
+        self.initial_state = self.states[0]
+        self.set_weather(self.initial_state)
 
+    def set_weather(self, state):
         # self._sun.set_azimuth(state.azimuth) see the comment on alititude in the yaml
         self._sun.set_altitude(state['altitude'])
 
@@ -42,6 +43,15 @@ class Weather(object):
         
         self.weather.sun_azimuth_angle = self._sun.azimuth
         self.weather.sun_altitude_angle = self._sun.altitude
+
+    def next(self):
+        try:
+            state = self.states_iter.__next__()
+            print(f"setting weather to", state['name'])
+            self.set_weather(state)
+            return 0
+        except StopIteration:
+            return -1
 
     def __str__(self):
         return '%s %s' % (self._sun)
@@ -79,6 +89,7 @@ class World():
     # Fix this organization -> decide whether Weather or world should hold the weather object
     def load_weathers(self, configs):
         self.weather = Weather(self.world.get_weather(), configs)
+        self.update_weather()
 
     def get_weather(self):
         return self.world.get_weather()
@@ -112,7 +123,8 @@ class World():
                 new_vehicles.append(vehicle)
                 successfully_spawned += 1
             else:
-                print('Could not spawn vehicle')
+                # print('Could not spawn vehicle')
+                pass
 
         for v in new_vehicles:
             v.set_autopilot(True) 
@@ -153,7 +165,7 @@ class World():
             if (loc != None):
                 spawn_point.location = loc
             else:
-                print("Could not spawn walker: location is none")
+                # print("Could not spawn walker: location is none")
                 continue
 
             walker = self.world.try_spawn_actor(blueprint, spawn_point)
@@ -161,7 +173,8 @@ class World():
                 new_walkers.append(walker)
                 successfully_spawned += 1
             else:
-                print('Could not spawn walker')
+                # print('Could not spawn walker')
+                pass
         
         batch = []
         walker_controller_bp = self.world.get_blueprint_library().find('controller.ai.walker')

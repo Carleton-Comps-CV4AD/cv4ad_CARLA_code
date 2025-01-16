@@ -50,7 +50,7 @@ class Ego_Vehicle():
         self.vehicle.set_autopilot(True)
 
 class Camera():
-    def __init__(self, world, sensor_queue, blueprint, transform, out_dir, file_type, cc = None):
+    def __init__(self, world, sensor_queue, blueprint, transform, name, file_type, cc = None, out_dir = "."):
         self.blueprint = blueprint
         self.transform = transform
         self.counter = 0
@@ -63,6 +63,7 @@ class Camera():
         self.camera.set_attribute('sensor_tick', str(SECONDS_PER_TICK))
 
         self.out_dir = out_dir
+        self.name = name
         self.file_type = file_type
         self.cc = cc
 
@@ -75,10 +76,13 @@ class Camera():
     def set_image_size(self, x = '1920', y = '1080'):
         self.camera.set_attribute('image_size_x', x)
         self.camera.set_attribute('image_size_y', y)
+
+    def set_shutter_speed(self, speed = 60):
+        self.camera.set_attribute('shutter_speed', str(speed))
     
     def listen(self, image):
         weather_name = self.weathers[self.counter // self.num_images_per_weather]
-        image_path = os.path.join(weather_name, self.out_dir, f'{self.counter}.{self.file_type}')
+        image_path = os.path.join(self.out_dir, weather_name, self.name, f'{self.counter}.{self.file_type}')
         if self.cc:
             image.save_to_disk(image_path, self.cc)
         else:

@@ -27,7 +27,8 @@ DEBUG = False
 # - When spawning fails, we should handle that more elegantly than just reporting it and then moving on
 # ! - We need to verify that car crashes / traffic jams no longer occur
 # ! - Decide on a final resolution to produce our image sets at
-# * - Implement deterministic mode so that we can recreate datasets
+# ! - set the ego vehicle model manually --> some of the models are not rigged with lights, and also the transform for the cameras is hard coded right now
+# - Implement deterministic mode so that we can recreate datasets
 # * - Add arg parsing so that we can specify the following from the command line:
 #     - num images per weather
 #     - num cars, pedestrians
@@ -35,13 +36,13 @@ DEBUG = False
 #     - map
 #     - photos per second / seconds per photo
 # - BUG: checking for dead pedestrians seems to happen twice in a row whenever it triggers
-# * - Will increasing the shutter speed decrase the blurryness of our images?
+# * - Will increasing the shutter speed decrease the blurryness of our images? --> it does not appear so
 #     - We already turned off motion blur and changed anti-aliasing mode to 1 in the engine configuration
 #     - The latter of these seems to have helped a little, but there is still substatial blurring
 
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
-    num_images_per_weather = 30
+    num_images_per_weather = 5
     
     try:
         sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -57,20 +58,26 @@ def main():
         
         # Read our weather configurations from yaml and then set the first configuration to be the current weather
         our_world.load_weathers('six_weathers.yaml')
+        our_world.update_weather()
+        print("Setting initial weather")
+        time.sleep(1)
 
         ego = Ego_Vehicle(our_world.world)
 
+        out_dir = "/Data/1_16"
+
         rgb_cam = Camera(our_world.world, sensor_queue, 'sensor.camera.rgb', carla.Transform(carla.Location(x=1.5, z=2.4)), 
-                         out_dir = '_outRaw', file_type = 'png', cc = carla.ColorConverter.Raw)
+                         name = 'rgb', file_type = 'png', cc = carla.ColorConverter.Raw, out_dir = out_dir)
         rgb_seg = Camera(our_world.world, sensor_queue, 'sensor.camera.semantic_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
-                         out_dir = '_outSeg', file_type = 'png')
+                         name = 'rgb_seg', file_type = 'png', out_dir = out_dir)
         lidar_cam = Camera(our_world.world, sensor_queue, 'sensor.lidar.ray_cast', carla.Transform(carla.Location(x=1.5, z=2.4)),
-                           out_dir = '_outLIDAR', file_type = 'ply')
+                           name = 'lidar', file_type = 'ply', out_dir = out_dir)
         lidar_seg = Camera(our_world.world, sensor_queue, 'sensor.lidar.ray_cast_semantic', carla.Transform(carla.Location(x=1.5, z=2.4)),
-                           out_dir = '_outLIDARseg', file_type = 'ply')
+                           name = 'lidar_seg', file_type = 'ply', out_dir = out_dir)
         
         rgb_cam.set_image_size()
         rgb_seg.set_image_size()
+        rgb_cam.set_shutter_speed(250)
 
         ego.add_camera(rgb_cam)
         ego.add_camera(rgb_seg)
@@ -98,12 +105,11 @@ def main():
                 last_photo_count = ego.cameras[0].counter
                 # for camera in ego.cameras:
                 #     camera.counter = 0
-                try:
-                    our_world.weather.next()
-                    time.sleep(1)
-                    
-                except StopIteration:
+
+                result = our_world.weather.next()
+                if result < 0:
                     break
+                time.sleep(1)
 
                 if our_world.weather._sun.altitude < 15:
                     ego.lights_on()
