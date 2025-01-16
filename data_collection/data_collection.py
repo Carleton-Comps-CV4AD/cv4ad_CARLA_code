@@ -11,18 +11,33 @@
 import glob
 import os
 import sys
-import carla # type: ignore <-- what is this
-import random
-import math
+import carla
 import time
-import yaml
-from queue import Queue
-from queue import Empty
+from queue import Queue, Empty
 
 from ego_vehicle import Ego_Vehicle, Camera
 from utilities import World
 
 DEBUG = False
+
+# TODO:
+# - Fix data organization re: ego vehicle class and weather class
+# - improve parameterization of vehicle, ego vehicle, and walker spawning
+#     - that is, we should be able to specify num cars / motorcycles, lane change percent, speeds, etc
+# - When spawning fails, we should handle that more elegantly than just reporting it and then moving on
+# ! - We need to verify that car crashes / traffic jams no longer occur
+# ! - Decide on a final resolution to produce our image sets at
+# * - Implement deterministic mode so that we can recreate datasets
+# * - Add arg parsing so that we can specify the following from the command line:
+#     - num images per weather
+#     - num cars, pedestrians
+#     - name of weather config folder
+#     - map
+#     - photos per second / seconds per photo
+# - BUG: checking for dead pedestrians seems to happen twice in a row whenever it triggers
+# * - Will increasing the shutter speed decrase the blurryness of our images?
+#     - We already turned off motion blur and changed anti-aliasing mode to 1 in the engine configuration
+#     - The latter of these seems to have helped a little, but there is still substatial blurring
 
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
@@ -62,7 +77,6 @@ def main():
         ego.add_camera(lidar_cam)
         ego.add_camera(lidar_seg)
         ego.configure_experiment(num_images_per_weather, [state['name'] for state in our_world.weather.states])
-
 
         car_count = 40
         walker_count = 60
@@ -113,9 +127,7 @@ def main():
                 except Empty:
                     print("    Some of the sensor information is missed")
                 ego.cameras[0].has_new_image = False
-                check_for_dead = True
-
-                
+                check_for_dead = True         
 
     finally:
         # These cameras are our camera objects so they need to destroy themselves
