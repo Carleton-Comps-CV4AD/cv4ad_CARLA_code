@@ -9,12 +9,12 @@ states:
     fog_density: 0
     wetness: 0
 
-  - name: foggy_day
-    azimuth: 0
+  - name: test
+    azimuth: 0 # ignoring this for now because I do not know what reasonable numbers for this are
     altitude: 70
-    cloudiness: 20
-    precipitation: 0
+    cloudiness: 100
+    precipitation: 100
     precipitation_deposits: 0
     wind_intensity: 0
-    fog_density: 50
+    fog_density: 0
     wetness: 0

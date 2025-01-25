@@ -5,3 +5,4 @@ _outLIDAR/
 _outLIDARseg/
 _outRaw/
 _outSeg/
+__pycache__/

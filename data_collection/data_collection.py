@@ -13,10 +13,14 @@ import os
 import sys
 import carla
 import time
+import cv2
+import numpy as np
 from queue import Queue, Empty
 
 from ego_vehicle import Ego_Vehicle, Camera
 from utilities import World
+import bounding_boxes as bb
+from bounding_boxes import get_image_point, configure_matrices
 
 DEBUG = False
 
@@ -40,9 +44,11 @@ DEBUG = False
 #     - We already turned off motion blur and changed anti-aliasing mode to 1 in the engine configuration
 #     - The latter of these seems to have helped a little, but there is still substatial blurring
 
+SECONDS_PER_TICK = 3
+
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
-    num_images_per_weather = 5
+    num_images_per_weather = 20
     
     try:
         sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -64,18 +70,31 @@ def main():
 
         ego = Ego_Vehicle(our_world.world)
 
-        out_dir = "/Data/1_16"
+        out_dir = "/Data/tracking_videos"
+
+        world_delta_seconds = our_world.world.get_settings().fixed_delta_seconds
+        ticks_per_image = SECONDS_PER_TICK // world_delta_seconds
+        assert ticks_per_image > 1
+        seconds_per_tick = world_delta_seconds * ticks_per_image
 
         rgb_cam = Camera(our_world.world, sensor_queue, 'sensor.camera.rgb', carla.Transform(carla.Location(x=1.5, z=2.4)), 
-                         name = 'rgb', file_type = 'png', cc = carla.ColorConverter.Raw, out_dir = out_dir)
+                         name = 'rgb', file_type = 'png', cc = carla.ColorConverter.Raw, out_dir = out_dir,
+                         seconds_per_tick = seconds_per_tick)
         rgb_seg = Camera(our_world.world, sensor_queue, 'sensor.camera.semantic_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
-                         name = 'rgb_seg', file_type = 'png', out_dir = out_dir)
+                         name = 'rgb_seg', file_type = 'png', out_dir = out_dir,
+                         seconds_per_tick = seconds_per_tick)
         lidar_cam = Camera(our_world.world, sensor_queue, 'sensor.lidar.ray_cast', carla.Transform(carla.Location(x=1.5, z=2.4)),
-                           name = 'lidar', file_type = 'ply', out_dir = out_dir)
+                           name = 'lidar', file_type = 'ply', out_dir = out_dir,
+                           seconds_per_tick = seconds_per_tick)
         lidar_seg = Camera(our_world.world, sensor_queue, 'sensor.lidar.ray_cast_semantic', carla.Transform(carla.Location(x=1.5, z=2.4)),
-                           name = 'lidar_seg', file_type = 'ply', out_dir = out_dir)
+                           name = 'lidar_seg', file_type = 'ply', out_dir = out_dir,
+                           seconds_per_tick = seconds_per_tick)
+        instance_seg = Camera(our_world.world, sensor_queue, 'sensor.camera.instance_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
+                           name = 'instance_seg', file_type = 'png', out_dir = out_dir,
+                           seconds_per_tick = seconds_per_tick)
         
         rgb_cam.set_image_size()
+        instance_seg.set_image_size()
         rgb_seg.set_image_size()
         rgb_cam.set_shutter_speed(250)
 
@@ -83,10 +102,11 @@ def main():
         ego.add_camera(rgb_seg)
         ego.add_camera(lidar_cam)
         ego.add_camera(lidar_seg)
+        ego.add_camera(instance_seg)
         ego.configure_experiment(num_images_per_weather, [state['name'] for state in our_world.weather.states])
 
         car_count = 40
-        walker_count = 60
+        walker_count = 0
 
         for i in range(1):
             spawned = our_world.spawn_car(number = car_count)
@@ -95,11 +115,12 @@ def main():
         for i in range(1):
             spawned = our_world.spawn_walker(number = walker_count)
             print(f"spawned {spawned}/{walker_count} attempted walkers")
-
+        
+        cv2.namedWindow('ImageWindowName', cv2.WINDOW_AUTOSIZE)
         last_photo_count = -1
         check_for_dead = True
         while True:
-
+            our_world.world.tick()  
             # Try and progress the weather to the next state if we have taken enough images for the current weather
             if ego.cameras[0].counter != last_photo_count and ego.cameras[0].counter % num_images_per_weather == 0:
                 last_photo_count = ego.cameras[0].counter
@@ -117,8 +138,6 @@ def main():
                     ego.lights_off()
                 our_world.update_weather()
 
-            our_world.world.tick()
-
             # Check for dead people every 15 frames. Delete their actors and spawn new ones
             if ego.cameras[0].counter % 5 == 0 and check_for_dead == True:
                 our_world.replace_dead_walkers()
@@ -126,14 +145,24 @@ def main():
 
             if ego.cameras[0].has_new_image:
                 try:
-                    for _ in range(len(ego.cameras)):
-                        s_frame = sensor_queue.get(True, 1.0)
-                        if DEBUG:
-                            print("    Frame: %d   Sensor: %s" % (s_frame[0], s_frame[1]))
+                    for i in range(len(ego.cameras)):
+                        img, sensor_name = sensor_queue.get(True, 2.0)
+                        # Only try to draw bb on separate screen if the cur image is the rgb image
+                        if sensor_name == 'sensor.camera.rgb' and ego.cameras[0].has_new_image:
+                            assert ego.cameras[0].blueprint == 'sensor.camera.rgb'
+                            camera = ego.cameras[0] # ! This should be the rgb camera
+                            bb_img = bb.get_bb_img(our_world.world, ego.vehicle, img, camera)
+                            cv2.imwrite(os.path.join("test_bb", f"bb_img_{img.frame}.png"), bb_img)
+                            if DEBUG or True:
+                                cv2.imshow('ImageWindowName',bb_img)
+
+                                if cv2.waitKey(10000) == ord('q'):
+                                    break
+                                cv2.destroyAllWindows()
                 except Empty:
                     print("    Some of the sensor information is missed")
                 ego.cameras[0].has_new_image = False
-                check_for_dead = True         
+                check_for_dead = True       
 
     finally:
         # These cameras are our camera objects so they need to destroy themselves

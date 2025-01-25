@@ -45,6 +45,7 @@ class Weather(object):
         self.weather.sun_altitude_angle = self._sun.altitude
 
     def next(self):
+        print("\n\n\n\n called next \n\n\n\n")
         try:
             state = self.states_iter.__next__()
             print(f"setting weather to", state['name'])
@@ -71,8 +72,8 @@ class World():
         self.settings = self.world.get_settings()
     
         # Set CARLA syncronous mode
-        self.settings.fixed_delta_seconds = 0.1
         self.settings.synchronous_mode = True
+        self.settings.fixed_delta_seconds = 0.05
         self.world.apply_settings(self.settings)
 
         # Traffic manager
