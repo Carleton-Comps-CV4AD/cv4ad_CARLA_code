@@ -5,4 +5,4 @@ _outLIDAR/
 _outLIDARseg/
 _outRaw/
 _outSeg/
-__pycache__/
+__pycache__/data_collection/__pycache__/

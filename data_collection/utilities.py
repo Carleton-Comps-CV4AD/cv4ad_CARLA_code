@@ -3,6 +3,13 @@ import yaml
 import random
 import logging
 
+# In general, I think the organization of this file is a bit off. Really, it shouldn't be called utilities.py
+# and the methods I have chosen to wrap/not wrap in the world wrapper class are a bit arbitrary. I think we should
+# refactor this to be more consistent and organized.
+
+# I inherited this sun/weather organization from the carla examples, but I think it's a bit uneccessary
+# I think I should just have a weather object that holds the weather and sun information. If someone feels 
+# like it, they can refactor this.
 class Sun(object):
     def __init__(self, azimuth, altitude):
         self.azimuth = azimuth
@@ -88,7 +95,7 @@ class World():
 
 
     # Fix this organization -> decide whether Weather or world should hold the weather object
-    def load_weathers(self, configs):
+    def load_weathers(self, configs: str):
         self.weather = Weather(self.world.get_weather(), configs)
         self.update_weather()
 
@@ -101,7 +108,7 @@ class World():
     def get_spawn_points(self):
         return self.world.get_map().get_spawn_points()
     
-    def get_blueprints(self, filter):
+    def get_blueprints(self, filter: str):
         return self.world.get_blueprint_library().filter(filter)
     
     def spawn_car(self, filter = 'vehicle.*.*', number = 1):

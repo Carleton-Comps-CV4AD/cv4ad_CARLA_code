@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 from ego_vehicle import Camera
+import carla
 
 def build_projection_matrix(w, h, fov, is_behind_camera=False):
     focal = w / (2.0 * np.tan(fov * np.pi / 360.0))
@@ -53,58 +54,63 @@ def configure_matrices(camera: Camera):
 
     return world_to_camera, K, K_b
 
-def ___get_bb_img(world, ego, img, camera: Camera):
-    world_to_camera, K, K_b = configure_matrices(camera)
-    img = np.reshape(np.copy(img.raw_data), (img.height, img.width, 4))
+# This is an old implementation that gets the bounding boxes from the world when the function is called, rather than storing
+# the bounding boxes in the camera object at the moment the image is taken and using that information to draw the bounding boxes
+# Really, these should be exactly the same, but the new implmentation uses some more memory
+# However, somewhere along the way using the new implemetation I fixed our bugs with misaligned boxes, so I'm not messing with it.
+# def get_bb_img(world, ego, img, camera: Camera):
+#     world_to_camera, K, K_b = configure_matrices(camera)
+#     img = np.reshape(np.copy(img.raw_data), (img.height, img.width, 4))
 
-    for npc in world.get_actors().filter('*vehicle*'):
+#     for npc in world.get_actors().filter('*vehicle*'):
 
-        # Filter out the ego vehicle
-        if npc.id != ego.id:
+#         # Filter out the ego vehicle
+#         if npc.id != ego.id:
 
-            bb = npc.bounding_box
-            dist = npc.get_transform().location.distance(ego.get_transform().location)
+#             bb = npc.bounding_box
+#             dist = npc.get_transform().location.distance(ego.get_transform().location)
 
-            # Filter for the vehicles within 50m
-            if dist < 100:
+#             # Filter for the vehicles within 50m
+#             if dist < 100:
 
-            # Calculate the dot product between the forward vector
-            # of the vehicle and the vector between the vehicle
-            # and the other vehicle. We threshold this dot product
-            # to limit to drawing bounding boxes IN FRONT OF THE CAMERA
-                forward_vec = ego.get_transform().get_forward_vector()
-                ray = npc.get_transform().location - ego.get_transform().location
+#             # Calculate the dot product between the forward vector
+#             # of the vehicle and the vector between the vehicle
+#             # and the other vehicle. We threshold this dot product
+#             # to limit to drawing bounding boxes IN FRONT OF THE CAMERA
+#                 forward_vec = ego.get_transform().get_forward_vector()
+#                 ray = npc.get_transform().location - ego.get_transform().location
 
-                if forward_vec.dot(ray) > 0:
-                    p1 = get_image_point(bb.location, K, world_to_camera)
-                    verts = [v for v in bb.get_world_vertices(npc.get_transform())]
-                    x_max = -10000
-                    x_min = 10000
-                    y_max = -10000
-                    y_min = 10000
+#                 if forward_vec.dot(ray) > 0:
+#                     p1 = get_image_point(bb.location, K, world_to_camera)
+#                     verts = [v for v in bb.get_world_vertices(npc.get_transform())]
+#                     x_max = -10000
+#                     x_min = 10000
+#                     y_max = -10000
+#                     y_min = 10000
 
-                    for vert in verts:
-                        p = get_image_point(vert, K, world_to_camera)
-                        # Find the rightmost vertex
-                        if p[0] > x_max:
-                            x_max = p[0]
-                        # Find the leftmost vertex
-                        if p[0] < x_min:
-                            x_min = p[0]
-                        # Find the highest vertex
-                        if p[1] > y_max:
-                            y_max = p[1]
-                        # Find the lowest  vertex
-                        if p[1] < y_min:
-                            y_min = p[1]
+#                     for vert in verts:
+#                         p = get_image_point(vert, K, world_to_camera)
+#                         # Find the rightmost vertex
+#                         if p[0] > x_max:
+#                             x_max = p[0]
+#                         # Find the leftmost vertex
+#                         if p[0] < x_min:
+#                             x_min = p[0]
+#                         # Find the highest vertex
+#                         if p[1] > y_max:
+#                             y_max = p[1]
+#                         # Find the lowest  vertex
+#                         if p[1] < y_min:
+#                             y_min = p[1]
 
-                    cv2.line(img, (int(x_min),int(y_min)), (int(x_max),int(y_min)), (0,0,255, 255), 1)
-                    cv2.line(img, (int(x_min),int(y_max)), (int(x_max),int(y_max)), (0,0,255, 255), 1)
-                    cv2.line(img, (int(x_min),int(y_min)), (int(x_min),int(y_max)), (0,0,255, 255), 1)
-                    cv2.line(img, (int(x_max),int(y_min)), (int(x_max),int(y_max)), (0,0,255, 255), 1)
-    return img
+#                     cv2.line(img, (int(x_min),int(y_min)), (int(x_max),int(y_min)), (0,0,255, 255), 1)
+#                     cv2.line(img, (int(x_min),int(y_max)), (int(x_max),int(y_max)), (0,0,255, 255), 1)
+#                     cv2.line(img, (int(x_min),int(y_min)), (int(x_min),int(y_max)), (0,0,255, 255), 1)
+#                     cv2.line(img, (int(x_max),int(y_min)), (int(x_max),int(y_max)), (0,0,255, 255), 1)
+#     return img
 
-def get_bb_img(world, ego, img, camera: Camera):
+# This is the new implementation that uses the bounding boxes stored in the camera object. This is the one that works.
+def get_bb_img(world: carla.World, ego: carla.Vehicle, img: np.ndarray, camera: Camera) -> np.ndarray:
     world_to_camera, K, K_b = configure_matrices(camera)
     img = np.reshape(np.copy(img.raw_data), (img.height, img.width, 4))
     ego_transform = None
