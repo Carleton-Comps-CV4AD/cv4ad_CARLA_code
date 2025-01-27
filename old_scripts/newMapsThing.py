@@ -32,13 +32,13 @@ def main():
         # requests in the localhost at port 2000.
         client = carla.Client('localhost', 2000)
         # client.set_timeout(2.0)
-        print(client.get_available_maps())
-        # world = client.load_world('Town03')
+        # print(client.get_available_maps())
+        world = client.load_world('Town02_Opt')
         world = client.get_world()
 
-        # spawn_points = world.get_map().get_spawn_points()
-        # for i, spawn_point in enumerate(spawn_points):
-        #     world.debug.draw_string(spawn_point.location, str(i), life_time=60)
+        spawn_points = world.get_map().get_spawn_points()
+        for i, spawn_point in enumerate(spawn_points):
+            world.debug.draw_string(spawn_point.location, str(i), life_time=60)
     
 
     finally:

@@ -72,7 +72,8 @@ class World():
         self.client.set_timeout(10.0)
 
         # Retrieve the world that is running
-        # world = client.load_world('Town10HD')
+        # self.world = self.client.load_world('Town02_Opt')
+        self.world = self.client.load_world('Town10HD')
         self.world = self.client.get_world()
         
         self.original_settings = self.world.get_settings()

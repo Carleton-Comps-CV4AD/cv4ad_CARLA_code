@@ -235,7 +235,7 @@ def initialize_agents(world, client, actor_list, spawn_points):
 
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
-    num_images_per_weather = 50
+    num_images_per_weather = 1250
     weather_config = 'six_weathers.yaml'
     
     try:
@@ -254,6 +254,8 @@ def main():
         client.set_timeout(10.0)
 
         # Retrieve the world that is running
+        world = client.load_world('Town02_Opt')
+        # world = client.load_world('Town10HD')
         world = client.get_world()
         original_settings = world.get_settings()
         settings = world.get_settings()

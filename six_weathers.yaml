@@ -1,13 +1,13 @@
 states:
-  - name: clear_day
-    azimuth: 0 # ignoring this for now because I do not know what reasonable numbers for this are
-    altitude: 70
-    cloudiness: 0
-    precipitation: 0
-    precipitation_deposits: 0
-    wind_intensity: 0
-    fog_density: 0
-    wetness: 0
+  # - name: clear_day
+  #   azimuth: 0 # ignoring this for now because I do not know what reasonable numbers for this are
+  #   altitude: 70
+  #   cloudiness: 0
+  #   precipitation: 0
+  #   precipitation_deposits: 0
+  #   wind_intensity: 0
+  #   fog_density: 0
+  #   wetness: 0
 
   - name: clear_night
     azimuth: 0

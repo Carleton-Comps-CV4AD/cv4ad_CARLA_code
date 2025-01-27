@@ -120,7 +120,7 @@ class Camera():
         blueprint_library = world.get_blueprint_library()
         self.camera = blueprint_library.find(blueprint)
         self.transform = carla.Transform(carla.Location(x=1.5, z=2.4))
-
+            
         self.camera.set_attribute('sensor_tick', str(SECONDS_PER_TICK))
 
         self.out_dir = out_dir
@@ -132,10 +132,6 @@ class Camera():
     def configure_experiment(self, num_images_per_weather, weathers):
         self.num_images_per_weather = num_images_per_weather
         self.weathers = weathers
-
-    def set_image_size(self, x = '1920', y = '1080'):
-        self.camera.set_attribute('image_size_x', x)
-        self.camera.set_attribute('image_size_y', y)
     
     def listen(self, image):
         weather_name = self.weathers[self.counter // self.num_images_per_weather]
@@ -156,7 +152,8 @@ class Camera():
         self.camera_actor.destroy()
 
 # ! Temporary function to fill the scene with vehicles and pedestrians. We should paratmetrize and organize this so that we can configure the scene easily
-def initialize_agents(world, client, actor_list, spawn_points):
+def initialize_Cars(world, client, actor_list, spawn_points, number):
+    #* spawns vechiles in our world, number decides how many cars to spawn.
     traffic_manager = client.get_trafficmanager()
     traffic_manager.set_synchronous_mode(True)
     # Select some models from the blueprint library
@@ -167,7 +164,7 @@ def initialize_agents(world, client, actor_list, spawn_points):
             blueprints.append(v)
 
     # Set a max number of vehicles and prepare a list for those we spawn
-    max_vehicles = 25
+    max_vehicles = number
     max_vehicles = min([max_vehicles, len(spawn_points)])
     vehicles = []
     
@@ -182,7 +179,10 @@ def initialize_agents(world, client, actor_list, spawn_points):
         traffic_manager.random_right_lanechange_percentage(v, .1)
         traffic_manager.auto_lane_change(v, True)  
     
-    # Spawn walkers
+    return vehicles
+
+def initialize_Walkers(world, client, actor_listw, spawn_points, number):
+    #* Spawn walkers, held in sperate walker lists to keep track of them, number tells program how many to try to spawn
     blueprint_library = world.get_blueprint_library()
     walker_bp = blueprint_library.filter('walker.pedestrian.*')
     walker_controller_bp = blueprint_library.find('controller.ai.walker')
@@ -191,7 +191,7 @@ def initialize_agents(world, client, actor_list, spawn_points):
     controllers = []
 
     spawn_points = []
-    for i in range(100):
+    for i in range(number):
         spawn_point = carla.Transform()
         spawn_point.location = world.get_random_location_from_navigation()
         if spawn_point.location is not None:
@@ -200,6 +200,9 @@ def initialize_agents(world, client, actor_list, spawn_points):
     sbatch = []
     for spawn_point in spawn_points:
         walker_bp_choice = random.choice(walker_bp)
+        if walker_bp_choice.has_attribute('is_invincible'):
+            walker_bp_choice.set_attribute('is_invincible', 'false')
+
         sbatch.append(carla.command.SpawnActor(walker_bp_choice, spawn_point))
 
     results = client.apply_batch_sync(sbatch, True)
@@ -226,17 +229,20 @@ def initialize_agents(world, client, actor_list, spawn_points):
         controller.go_to_location(world.get_random_location_from_navigation())
         controller.set_max_speed(random.uniform(1.0, 3.0))  # Random speeds
 
+
+
     print(f"Spawned {len(walkers)} walkers.")
 
-    actor_list.extend(walker_actors)
-    actor_list.extend(controller_actors)
+    actor_listw.extend(walker_actors)
+    actor_listw.extend(controller_actors)
 
-    return vehicles, walker_actors
+    return walker_actors
+
+
 
 def main():
     # * Configure how many images we want per weather scenario from weathers.yaml. Should probably be around 1200/n, where n is the number of cities. Leave at 2 for testing.
-    num_images_per_weather = 50
-    weather_config = 'six_weathers.yaml'
+    num_images_per_weather = 400
     
     try:
         sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -247,26 +253,30 @@ def main():
         pass
 
     actor_list = []
-    
+    actor_listw = []
+
     try:
         # Create client and connect to server (the simulator)
         client = carla.Client('localhost', 2000)
         client.set_timeout(10.0)
 
         # Retrieve the world that is running
+        # world = client.load_world('Town10HD')
         world = client.get_world()
+        
         original_settings = world.get_settings()
         settings = world.get_settings()
-
+    
         # Set CARLA syncronous mode
         settings.fixed_delta_seconds = 0.1
         settings.synchronous_mode = True
         world.apply_settings(settings)
+        
 
         sensor_queue = Queue()
 
         # Read our weather configurations from yaml and then set the first configuration to be the current weather
-        weather = Weather(world.get_weather(), weather_config)
+        weather = Weather(world.get_weather(), 'weathers.yaml')
 
         # The world contains the list of blueprints that we can use for adding new actors into the simulation.
         blueprint_library = world.get_blueprint_library()
@@ -277,10 +287,8 @@ def main():
 
         rgb_cam = Camera(world, sensor_queue, 'sensor.camera.rgb', carla.Transform(carla.Location(x=1.5, z=2.4)), 
                          out_dir = '_outRaw', file_type = 'png', cc = carla.ColorConverter.Raw)
-        rgb_cam.set_image_size()
         rgb_seg = Camera(world, sensor_queue, 'sensor.camera.semantic_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
                          out_dir = '_outSeg', file_type = 'png')
-        rgb_seg.set_image_size()
         lidar_cam = Camera(world, sensor_queue, 'sensor.lidar.ray_cast', carla.Transform(carla.Location(x=1.5, z=2.4)),
                            out_dir = '_outLIDAR', file_type = 'ply')
         lidar_seg = Camera(world, sensor_queue, 'sensor.lidar.ray_cast_semantic', carla.Transform(carla.Location(x=1.5, z=2.4)),
@@ -295,9 +303,17 @@ def main():
         # Store so we can delete later. Actors do not get removed automatically
         actor_list.append(ego.vehicle)
 
-        vehicles, walkers = initialize_agents(world, client, actor_list, spawn_points)
+        
+
+
+        #* CHANGE PARAMETERS
+        vehicles = initialize_Cars(world, client, actor_list, spawn_points, 25)
+        walkers = initialize_Walkers(world, client, actor_listw, spawn_points, 80)
+        
 
         last_value = -1
+
+        startKilling = True
         while True:
 
             # Try and progress the weather to the next state if we have taken enough images for the current weather
@@ -307,9 +323,7 @@ def main():
                 #     camera.counter = 0
                 try:
                     weather.next()
-                    for walker in walkers:
-                        print(walker.is_alive)
-                    time.sleep(1)
+                    time.sleep(1)     
                 except StopIteration:
                     break
 
@@ -319,16 +333,28 @@ def main():
                     ego.lights_off()
                 world.set_weather(weather.weather)
 
+            if ego.cameras[0].counter == 200 and startKilling == True:
+                print('kill actors')
+                client.apply_batch([carla.command.DestroyActor(x) for x in actor_listw])
+                initialize_Walkers(world, client, actor_listw, spawn_points, 80)
+                print('new actors amount: ', len(walkers))
+                startKilling = False
+                
+
             world.tick()
 
             if ego.cameras[0].has_new_image:
                 try:
                     for _ in range(len(ego.cameras)):
                         s_frame = sensor_queue.get(True, 1.0)
-                        # print("    Frame: %d   Sensor: %s" % (s_frame[0], s_frame[1]))
+                        print("    Frame: %d   Sensor: %s" % (s_frame[0], s_frame[1]))
                 except Empty:
                     print("    Some of the sensor information is missed")
                 ego.cameras[0].has_new_image = False
+                startKilling = True
+
+
+            
 
     finally:
         world.apply_settings(original_settings)
@@ -337,7 +363,7 @@ def main():
             camera.destroy()
 
         print('destroying actors')
-        client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
+        client.apply_batch([carla.command.DestroyActor(x) for x in actor_listw])
         client.apply_batch([carla.command.DestroyActor(x) for x in vehicles]) # Why is this separate from the actor list above?
         print('done.')
 
