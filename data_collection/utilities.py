@@ -1,233 +1,59 @@
-import carla
-import yaml
-import random
-import logging
+from queue import Queue, Empty
+from world import World
+from ego_vehicle import Ego_Vehicle
+import time
+import os
+import cv2
+import bounding_boxes as bb
 
-# In general, I think the organization of this file is a bit off. Really, it shouldn't be called utilities.py
-# and the methods I have chosen to wrap/not wrap in the world wrapper class are a bit arbitrary. I think we should
-# refactor this to be more consistent and organized.
+def quantize_to_tick(seconds_per_tick: int, world_delta_seconds: int) -> int:
+    ticks_per_image = seconds_per_tick // world_delta_seconds
+    assert ticks_per_image > 1 # Do not set the seconds per tick to be less than the world delta seconds. I don't know what will happen, but it doesn't seem like a good idea
+    seconds_per_tick = world_delta_seconds * ticks_per_image
+    return seconds_per_tick
 
-# I inherited this sun/weather organization from the carla examples, but I think it's a bit uneccessary
-# I think I should just have a weather object that holds the weather and sun information. If someone feels 
-# like it, they can refactor this.
-class Sun(object):
-    def __init__(self, azimuth, altitude):
-        self.azimuth = azimuth
-        self.altitude = altitude
-        self._t = 0.0
+# Check if we need to progress the weather to the next state and if so, do it
+def check_next_weather(ego: Ego_Vehicle, world: World, num_images_per_weather: int, last_photo_count: int) -> int:
+    if ego.cameras[0].counter != last_photo_count and ego.cameras[0].counter % num_images_per_weather == 0:
+        last_photo_count = ego.cameras[0].counter
 
-    def set_azimuth(self, azimuth):
-        self.azimuth = azimuth
-    
-    def set_altitude(self, altitude):
-        self.altitude = altitude
-
-    def __str__(self):
-        return 'Sun(alt: %.2f, azm: %.2f)' % (self.altitude, self.azimuth)
-
-class Weather(object):
-    def __init__(self, weather, configs):
-        self.weather = weather
-        self._sun = Sun(weather.sun_azimuth_angle, weather.sun_altitude_angle)
-
-        with open(configs, 'r') as file:
-            self.states = yaml.safe_load(file)['states']
-            self.states_iter = iter(self.states)
-
-        self.initial_state = self.states[0]
-        self.set_weather(self.initial_state)
-
-    def set_weather(self, state):
-        # self._sun.set_azimuth(state.azimuth) see the comment on alititude in the yaml
-        self._sun.set_altitude(state['altitude'])
-
-        self.weather.cloudiness = state['cloudiness']
-        self.weather.precipitation = state['precipitation']
-        self.weather.precipitation_deposits = state['precipitation_deposits']
-        self.weather.wind_intensity = state['wind_intensity']
-        self.weather.fog_density = state['fog_density']
-        self.weather.wetness = state['wetness']
-        
-        self.weather.sun_azimuth_angle = self._sun.azimuth
-        self.weather.sun_altitude_angle = self._sun.altitude
-
-    def next(self):
-        print("\n\n\n\n called next \n\n\n\n")
-        try:
-            state = self.states_iter.__next__()
-            print(f"setting weather to", state['name'])
-            self.set_weather(state)
-            return 0
-        except StopIteration:
+        result = world.weather.next()
+        if result < 0:
             return -1
+        time.sleep(1)
 
-    def __str__(self):
-        return '%s %s' % (self._sun)
+        if world.weather._sun.altitude < 15:
+            ego.lights_on()
+        else:
+            ego.lights_off()
+        world.update_weather()
+    return last_photo_count
 
-class World():
-    def __init__(self, host: str, port: int, synchronous: bool = True, 
-                 max_num_vehicles: int = 50, max_num_walkers: int = 100):
-        # Create client and connect to server (the simulator)
-        self.client = carla.Client('localhost', 2000)
-        self.client.set_timeout(10.0)
+# Check if we need to replace dead walkers and if so, do it
+def check_dead(cur_image_num: int, check_for_dead: bool, world: World, interval: int) -> bool:
+    if cur_image_num % interval == 0 and check_for_dead:
+        world.replace_dead_walkers()
+        return False
+    return check_for_dead
 
-        # Retrieve the world that is running
-        # self.world = self.client.load_world('Town02_Opt')
-        self.world = self.client.load_world('Town10HD')
-        self.world = self.client.get_world()
-        
-        self.original_settings = self.world.get_settings()
-        self.settings = self.world.get_settings()
-    
-        # Set CARLA syncronous mode
-        self.settings.synchronous_mode = True
-        self.settings.fixed_delta_seconds = 0.05
-        self.world.apply_settings(self.settings)
+def check_has_image(ego: Ego_Vehicle, sensor_queue: Queue, world: World, debug: bool, draw_bounding_box: bool) -> None:
+    if ego.cameras[0].has_new_image:
+        try:
+            for i in range(len(ego.cameras)):
+                img, sensor_name = sensor_queue.get(True, 2.0)
+                if draw_bounding_box:
+                    # Only try to draw bb on separate screen if the cur image is the rgb image
+                    if sensor_name == 'sensor.camera.rgb' and ego.cameras[0].has_new_image:
+                        assert ego.cameras[0].blueprint == 'sensor.camera.rgb'
+                        camera = ego.cameras[0] # ! This should be the rgb camera, but is not guaranteed to be
+                        bb_img = bb.get_bb_img(world.world, ego.vehicle, img, camera)
+                        cv2.imwrite(os.path.join("test_bb", f"bb_img_{img.frame}.png"), bb_img)
+                        if debug:
+                            cv2.imshow('ImageWindowName',bb_img)
 
-        # Traffic manager
-        self.traffic_manager = self.client.get_trafficmanager()
-        self.traffic_manager.set_synchronous_mode(True)
-
-        self.walkers = []
-        self.vehicles = []
-
-        self.max_num_vehicles = max_num_vehicles
-        self.max_num_walkers = max_num_walkers
-
-
-    # Fix this organization -> decide whether Weather or world should hold the weather object
-    def load_weathers(self, configs: str):
-        self.weather = Weather(self.world.get_weather(), configs)
-        self.update_weather()
-
-    def get_weather(self):
-        return self.world.get_weather()
-    
-    def update_weather(self):
-        self.world.set_weather(self.weather.weather)
-    
-    def get_spawn_points(self):
-        return self.world.get_map().get_spawn_points()
-    
-    def get_blueprints(self, filter: str):
-        return self.world.get_blueprint_library().filter(filter)
-    
-    def spawn_car(self, filter = 'vehicle.*.*', number = 1):
-        if len(self.vehicles) > self.max_num_vehicles:
-            # raise Exception('Max number of vehicles reached')
-            print('Max number of vehicles reached')
-
-        spawn_points = self.get_spawn_points()
-
-        max_vehicles = 30
-        max_vehicles = min([max_vehicles, len(spawn_points)])
-        new_vehicles = []
-        
-        successfully_spawned = 0
-        for i in range(number):
-            blueprint = random.choice(self.world.get_blueprint_library().filter(filter))
-            spawn_point = random.choice(spawn_points)
-            vehicle = self.world.try_spawn_actor(blueprint, spawn_point)
-            if vehicle is not None:
-                new_vehicles.append(vehicle)
-                successfully_spawned += 1
-            else:
-                # print('Could not spawn vehicle')
-                pass
-
-        for v in new_vehicles:
-            v.set_autopilot(True) 
-            self.traffic_manager.random_left_lanechange_percentage(v, .1)
-            self.traffic_manager.random_right_lanechange_percentage(v, .1)
-            self.traffic_manager.auto_lane_change(v, True)  
-            self.traffic_manager.set_synchronous_mode(True)
-        
-        self.vehicles.extend(new_vehicles)
-
-        return successfully_spawned
-
-        
-    def spawn_walker(self, filter = 'walker.pedestrian.*', number = 1):
-        if len(self.walkers) > self.max_num_walkers:
-            raise Exception('Max number of walkers reached')
-        
-        spawn_points = []
-        for i in range(number):
-            spawn_point = carla.Transform()
-            loc = self.world.get_random_location_from_navigation()
-            if (loc != None):
-                spawn_point.location = loc
-                spawn_points.append(spawn_point)
-
-        new_walkers = []
-        
-        # Select some models from the blueprint library
-        blueprint = random.choice(self.world.get_blueprint_library().filter(filter))
-        if blueprint.has_attribute('is_invincible'):
-            blueprint.set_attribute('is_invincible', 'false')
-
-        successfully_spawned = 0
-        for i in range(number):
-            blueprint = random.choice(self.world.get_blueprint_library().filter(filter))
-            spawn_point = carla.Transform()
-            loc = self.world.get_random_location_from_navigation()
-            if (loc != None):
-                spawn_point.location = loc
-            else:
-                # print("Could not spawn walker: location is none")
-                continue
-
-            walker = self.world.try_spawn_actor(blueprint, spawn_point)
-            if walker is not None:
-                new_walkers.append(walker)
-                successfully_spawned += 1
-            else:
-                # print('Could not spawn walker')
-                pass
-        
-        batch = []
-        walker_controller_bp = self.world.get_blueprint_library().find('controller.ai.walker')
-        for i in range(len(new_walkers)):
-            batch.append(carla.command.SpawnActor(walker_controller_bp, carla.Transform(), new_walkers[i]))
-        results = self.client.apply_batch_sync(batch, True)
-        for i in range(len(results)):
-            if results[i].error:
-                logging.error(results[i].error)
-            else:
-                controller_id = results[i].actor_id
-                controller = self.world.get_actor(controller_id)
-                controller.start()
-                controller.go_to_location(self.world.get_random_location_from_navigation())
-                controller.set_max_speed(random.uniform(1.0, 3.0))  # Random speeds
-                self.walkers.append((new_walkers[i], controller))
-
-        return successfully_spawned
-
-    def replace_dead_walkers(self):
-        death_count = 0
-        respawn_count = 0
-
-        for walker, controller in self.walkers:
-            if walker.is_active == False:
-                death_count += 1
-                self.client.apply_batch([carla.command.DestroyActor(walker)])
-                self.client.apply_batch([carla.command.DestroyActor(controller)])
-                self.walkers.remove((walker, controller))
-                successfully_spawned = 0
-
-                attempts = 0
-                while successfully_spawned == 0 and attempts < 10:
-                    successfully_spawned = self.spawn_walker()
-                    attempts += 1
-                respawn_count += 1
-        
-        print(f"{death_count} dead walkers replaced with {respawn_count} new walkers")
-    
-    def clean_up(self):
-        self.world.apply_settings(self.original_settings)
-        self.client.apply_batch([carla.command.DestroyActor(x) for x in self.vehicles])
-        self.client.apply_batch([carla.command.DestroyActor(x[0]) for x in self.walkers])
-        self.client.apply_batch([carla.command.DestroyActor(x[1]) for x in self.walkers])
-        self.vehicles = []
-        self.walkers = []
-        print('Cleaned up')
+                            if cv2.waitKey(10000) == ord('q'):
+                                break
+                            cv2.destroyAllWindows()
+        except Empty:
+            print("    Some of the sensor information is missed")
+        ego.cameras[0].has_new_image = False

@@ -19,9 +19,11 @@ from queue import Queue, Empty
 import argparse
 
 from ego_vehicle import Ego_Vehicle, Camera
-from utilities import World
+from world import World
 import bounding_boxes as bb
 from bounding_boxes import get_image_point, configure_matrices
+from utilities import quantize_to_tick, check_next_weather, check_dead, check_has_image
+
 # TODO:
 # - Fix data organization re: ego vehicle class and weather class
 # - improve parameterization of vehicle, ego vehicle, and walker spawning
@@ -30,69 +32,16 @@ from bounding_boxes import get_image_point, configure_matrices
 # ! - We need to verify that car crashes / traffic jams no longer occur
 # ! - Decide on a final resolution to produce our image sets at
 # ! - set the ego vehicle model manually --> some of the models are not rigged with lights, and also the transform for the cameras is hard coded right now
-# - Implement deterministic mode so that we can recreate datasets
+# TODO - Implement deterministic mode so that we can recreate datasets
+# TODO - Write something to qualify the difficulty of our images using the bounding boxes
+#        - That is, define some function of overlappingness and stuff
+# - We should not draw bounding boxes of hidden vehicles
 # * - Add arg parsing so that we can specify the following from the command line:
-#     - num images per weather
-#     - num cars, pedestrians
-#     - name of weather config folder
 #     - map
-#     - photos per second / seconds per photo
 # - BUG: checking for dead pedestrians seems to happen twice in a row whenever it triggers
 # * - Will increasing the shutter speed decrease the blurryness of our images? --> it does not appear so
 #     - We already turned off motion blur and changed anti-aliasing mode to 1 in the engine configuration
 #     - The latter of these seems to have helped a little, but there is still substatial blurring
-
-def quantize_to_tick(seconds_per_tick: int, world_delta_seconds: int) -> int:
-    ticks_per_image = seconds_per_tick // world_delta_seconds
-    assert ticks_per_image > 1 # Do not set the seconds per tick to be less than the world delta seconds. I don't know what will happen, but it doesn't seem like a good idea
-    seconds_per_tick = world_delta_seconds * ticks_per_image
-    return seconds_per_tick
-
-# Check if we need to progress the weather to the next state and if so, do it
-def check_next_weather(ego: Ego_Vehicle, world: World, num_images_per_weather: int, last_photo_count: int) -> int:
-    if ego.cameras[0].counter != last_photo_count and ego.cameras[0].counter % num_images_per_weather == 0:
-        last_photo_count = ego.cameras[0].counter
-
-        result = world.weather.next()
-        if result < 0:
-            return -1
-        time.sleep(1)
-
-        if world.weather._sun.altitude < 15:
-            ego.lights_on()
-        else:
-            ego.lights_off()
-        world.update_weather()
-    return last_photo_count
-
-# Check if we need to replace dead walkers and if so, do it
-def check_dead(cur_image_num: int, check_for_dead: bool, world: World, interval: int) -> bool:
-    if cur_image_num % interval == 0 and check_for_dead:
-        world.replace_dead_walkers()
-        return False
-    return check_for_dead
-
-def check_has_image(ego: Ego_Vehicle, sensor_queue: Queue, world: World, debug: bool, draw_bounding_box: bool) -> None:
-    if ego.cameras[0].has_new_image:
-        try:
-            for i in range(len(ego.cameras)):
-                img, sensor_name = sensor_queue.get(True, 2.0)
-                if draw_bounding_box:
-                    # Only try to draw bb on separate screen if the cur image is the rgb image
-                    if sensor_name == 'sensor.camera.rgb' and ego.cameras[0].has_new_image:
-                        assert ego.cameras[0].blueprint == 'sensor.camera.rgb'
-                        camera = ego.cameras[0] # ! This should be the rgb camera, but is not guaranteed to be
-                        bb_img = bb.get_bb_img(world.world, ego.vehicle, img, camera)
-                        cv2.imwrite(os.path.join("test_bb", f"bb_img_{img.frame}.png"), bb_img)
-                        if debug:
-                            cv2.imshow('ImageWindowName',bb_img)
-
-                            if cv2.waitKey(10000) == ord('q'):
-                                break
-                            cv2.destroyAllWindows()
-        except Empty:
-            print("    Some of the sensor information is missed")
-        ego.cameras[0].has_new_image = False
 
 def main():
     # Parse command line arguments
@@ -103,8 +52,9 @@ def main():
     parser.add_argument('--debug', action='store_true', help='Run in debug mode')
     parser.add_argument('--car_count', type=int, default=40, help='Number of cars to spawn')
     parser.add_argument('--walker_count', type=int, default=40, help='Number of walkers to spawn')
-    parser.add_argument('--output_dir', type=str, default=os.path.join('/Data', time.strftime("%m%d-%H%M%S")), help='Output directory for images')
+    parser.add_argument('--output_dir', type=str, default=os.path.join('/Data', time.strftime("%m%d-%H%M")), help='Output directory for images')
     parser.add_argument('--draw_bounding_box', action='store_true', help='Draw bounding boxes on images')
+    parser.add_argument('--random_seed', type=int, help='Use deterministic mode with this seed', default=None)
     args = parser.parse_args()
     seconds_per_tick = args.seconds_per_tick
     num_images_per_weather = args.num_images_per_weather
@@ -114,6 +64,9 @@ def main():
     out_dir = args.output_dir
     draw_bounding_box = args.draw_bounding_box
     debug = args.debug
+    random_seed = args.random_seed
+    if random_seed:
+        out_dir = out_dir + f"_seed:{random_seed}"
     
     try:
         sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -125,7 +78,7 @@ def main():
 
     try:
         sensor_queue = Queue()
-        our_world = World('localhost', 2000)
+        our_world = World('localhost', 2000, random_seed = random_seed) 
         
         # Read our weather configurations from yaml and then set the first configuration to be the current weather
         our_world.load_weathers(weather_config)
