@@ -30,7 +30,7 @@ def get_vehicle_locations(world):
 # This is pretty bad organization and I should fix this. Sorry :(
 class Camera():
     def __init__(self, world: carla.World, sensor_queue, blueprint: str, transform: carla.Transform, 
-                 name, file_type, cc = None, out_dir = ".", seconds_per_tick = 0):
+                 name, file_type, cc = None, out_dir = ".", seconds_per_tick = 0, video_mode_state = False, video_wait = 0, video_images_saved = 0):
         self.blueprint: str = blueprint
         self.transform = transform
         self.counter = 0
@@ -54,6 +54,10 @@ class Camera():
         self.world_vehicles_locations_at_last_image = None
         self.transform_at_last_image = None
 
+        self.video_mode = video_mode_state
+        self.video_images_saved = video_images_saved
+        self.video_images_wait = video_wait
+
     def set_actor(self, actor):
         self.camera = actor
 
@@ -70,9 +74,13 @@ class Camera():
     
     def listen(self, image):
         print(f"{self.name}, {self.counter}")
+        if self.video_mode and (self.counter % (self.video_images_wait + self.video_images_saved)) >= self.video_images_saved:
+            
+            self.increment()
+            return
         self.world_vehicles_locations_at_last_image = get_vehicle_locations(self.world)
 
-        # ! Here too. See the comment above that says "Warning"
+        # ! Here too. See the comment above that says "Warning`"
         self.transform_at_last_image = self.camera.get_transform()
 
         self.sensor_queue.put((image, self.blueprint))

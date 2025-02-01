@@ -57,3 +57,4 @@ def check_has_image(ego: Ego_Vehicle, sensor_queue: Queue, world: World, debug: 
         except Empty:
             print("    Some of the sensor information is missed")
         ego.cameras[0].has_new_image = False
+        time.sleep(0.3)

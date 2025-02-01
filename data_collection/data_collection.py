@@ -32,8 +32,7 @@ from utilities import quantize_to_tick, check_next_weather, check_dead, check_ha
 # ! - We need to verify that car crashes / traffic jams no longer occur
 # ! - Decide on a final resolution to produce our image sets at
 # ! - set the ego vehicle model manually --> some of the models are not rigged with lights, and also the transform for the cameras is hard coded right now
-# TODO - Implement deterministic mode so that we can recreate datasets
-# TODO - Write something to qualify the difficulty of our images using the bounding boxes
+# - Write something to qualify the difficulty of our images using the bounding boxes
 #        - That is, define some function of overlappingness and stuff
 # - We should not draw bounding boxes of hidden vehicles
 # * - Add arg parsing so that we can specify the following from the command line:
@@ -43,18 +42,29 @@ from utilities import quantize_to_tick, check_next_weather, check_dead, check_ha
 #     - We already turned off motion blur and changed anti-aliasing mode to 1 in the engine configuration
 #     - The latter of these seems to have helped a little, but there is still substatial blurring
 
+# - BUG: when frame rate is really high, the print statments for the counters for the camera but the images are synched so its weird
+
+# python3 data_collection.py --seconds_per_tick 0.166667 --random_seed 123456 --video_mode --video_images_saved 18 --videos_wanted 500 --video_images_wait 30
+
+
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Data Collection')
     parser.add_argument('--num_images_per_weather', type=int, default=20, help='Number of images to take per weather scenario')
     parser.add_argument('--weather_config', type=str, default='six_weathers.yaml', help='Name of the weather configuration folder')
-    parser.add_argument('--seconds_per_tick', type=int, default=3, help='Number of seconds between each photo taken')
+    parser.add_argument('--seconds_per_tick', type=float, default=3, help='Number of seconds between each photo taken')
     parser.add_argument('--debug', action='store_true', help='Run in debug mode')
     parser.add_argument('--car_count', type=int, default=40, help='Number of cars to spawn')
     parser.add_argument('--walker_count', type=int, default=40, help='Number of walkers to spawn')
     parser.add_argument('--output_dir', type=str, default=os.path.join('/Data', time.strftime("%m%d-%H%M")), help='Output directory for images')
     parser.add_argument('--draw_bounding_box', action='store_true', help='Draw bounding boxes on images')
     parser.add_argument('--random_seed', type=int, help='Use deterministic mode with this seed', default=None)
+    parser.add_argument('--video_mode', action='store_true', help='Turn on video mode')
+    parser.add_argument('--video_images_saved', type=int, default=None, help='Number of images to save in video mode')
+    parser.add_argument('--videos_wanted', type=int, default=None, help='Number of images to wait for in video mode')
+    parser.add_argument('--video_images_wait', type=int, default=None, help='Number of images to wait for in video mode')
+
+
     args = parser.parse_args()
     seconds_per_tick = args.seconds_per_tick
     num_images_per_weather = args.num_images_per_weather
@@ -65,6 +75,19 @@ def main():
     draw_bounding_box = args.draw_bounding_box
     debug = args.debug
     random_seed = args.random_seed
+    video_mode = args.video_mode
+    video_images_saved = args.video_images_saved
+    video_images_wait = args.video_images_wait
+    videos_wanted = args.videos_wanted
+    
+    if video_mode:
+        if not video_images_saved or not videos_wanted:
+            # saved < wait
+            raise Exception("In video mode, but no images will be saved for. \n Please enter both --video_images_saved and --videos_wanted flags")
+        num_images_per_weather = videos_wanted * (video_images_saved + video_images_wait)
+
+        print(f"Setting num images per weather to {num_images_per_weather} to capture {videos_wanted} videos with {video_images_saved} images each, waiting {video_images_wait} images between videos")
+
     if random_seed:
         out_dir = out_dir + f"_seed:{random_seed}"
     
@@ -96,30 +119,33 @@ def main():
         # And we also configure a bunch of stuff in main and its all kind of terrible :/
         rgb_cam = Camera(our_world.world, sensor_queue, 'sensor.camera.rgb', carla.Transform(carla.Location(x=1.5, z=2.4)), 
                          name = 'rgb', file_type = 'png', cc = carla.ColorConverter.Raw, out_dir = out_dir,
-                         seconds_per_tick = seconds_per_tick)
+                         seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
         rgb_seg = Camera(our_world.world, sensor_queue, 'sensor.camera.semantic_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
                          name = 'rgb_seg', file_type = 'png', out_dir = out_dir,
-                         seconds_per_tick = seconds_per_tick)
-        lidar_cam = Camera(our_world.world, sensor_queue, 'sensor.lidar.ray_cast', carla.Transform(carla.Location(x=1.5, z=2.4)),
-                           name = 'lidar', file_type = 'ply', out_dir = out_dir,
-                           seconds_per_tick = seconds_per_tick)
-        lidar_seg = Camera(our_world.world, sensor_queue, 'sensor.lidar.ray_cast_semantic', carla.Transform(carla.Location(x=1.5, z=2.4)),
-                           name = 'lidar_seg', file_type = 'ply', out_dir = out_dir,
-                           seconds_per_tick = seconds_per_tick)
-        instance_seg = Camera(our_world.world, sensor_queue, 'sensor.camera.instance_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
-                           name = 'instance_seg', file_type = 'png', out_dir = out_dir,
-                           seconds_per_tick = seconds_per_tick)
+                         seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
         
+        if not video_mode:
+            lidar_cam = Camera(our_world.world, sensor_queue, 'sensor.lidar.ray_cast', carla.Transform(carla.Location(x=1.5, z=2.4)),
+                            name = 'lidar', file_type = 'ply', out_dir = out_dir,
+                            seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
+            lidar_seg = Camera(our_world.world, sensor_queue, 'sensor.lidar.ray_cast_semantic', carla.Transform(carla.Location(x=1.5, z=2.4)),
+                            name = 'lidar_seg', file_type = 'ply', out_dir = out_dir,
+                            seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
+            ego.add_camera(lidar_cam)
+            ego.add_camera(lidar_seg)
+        else:
+            instance_seg = Camera(our_world.world, sensor_queue, 'sensor.camera.instance_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
+                            name = 'instance_seg', file_type = 'png', out_dir = out_dir,
+                            seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
+            instance_seg.set_image_size()
+            ego.add_camera(instance_seg)
+
         rgb_cam.set_image_size()
-        instance_seg.set_image_size()
         rgb_seg.set_image_size()
-        rgb_cam.set_shutter_speed(250) # Really not clear if this does anything for us, but it doesn't hurt. We were trying to reduce motion blur
+        rgb_cam.set_shutter_speed(2500) # Really not clear if this does anything for us, but it doesn't hurt. We were trying to reduce motion blur
 
         ego.add_camera(rgb_cam)
         ego.add_camera(rgb_seg)
-        ego.add_camera(lidar_cam)
-        ego.add_camera(lidar_seg)
-        ego.add_camera(instance_seg)
 
         # The way we have this organized is the car knows how many images to take per weather, and how many weathers there are.
         # It then passes this information to the camera objects, which are responsible for saving the images to different folders
