@@ -142,7 +142,7 @@ def main():
 
         rgb_cam.set_image_size()
         rgb_seg.set_image_size()
-        rgb_cam.set_shutter_speed(2500) # Really not clear if this does anything for us, but it doesn't hurt. We were trying to reduce motion blur
+        rgb_cam.set_shutter_speed(250) # Really not clear if this does anything for us, but it doesn't hurt. We were trying to reduce motion blur
 
         ego.add_camera(rgb_cam)
         ego.add_camera(rgb_seg)
@@ -169,7 +169,8 @@ def main():
             our_world.world.tick()  
             # Try and progress the weather to the next state if we have taken enough images for the current weather
             last_photo_count = check_next_weather(ego, our_world, num_images_per_weather, last_photo_count)
-            if last_photo_count < 0:
+            if last_photo_count < -1:
+                print("at last photo count")
                 break
 
             # Check for dead people every 15 frames. Delete their actors and spawn new ones

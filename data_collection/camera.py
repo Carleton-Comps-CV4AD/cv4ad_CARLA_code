@@ -75,7 +75,6 @@ class Camera():
     def listen(self, image):
         print(f"{self.name}, {self.counter}")
         if self.video_mode and (self.counter % (self.video_images_wait + self.video_images_saved)) >= self.video_images_saved:
-            
             self.increment()
             return
         self.world_vehicles_locations_at_last_image = get_vehicle_locations(self.world)

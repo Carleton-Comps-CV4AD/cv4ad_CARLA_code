@@ -19,7 +19,7 @@ def check_next_weather(ego: Ego_Vehicle, world: World, num_images_per_weather: i
 
         result = world.weather.next()
         if result < 0:
-            return -1
+            return -5
         time.sleep(1)
 
         if world.weather._sun.altitude < 15:
