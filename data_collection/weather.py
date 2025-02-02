@@ -1,4 +1,5 @@
 import yaml
+import itertools
 
 # I inherited this sun/weather organization from the carla examples, but I think it's a bit uneccessary
 # I think I should just have a weather object that holds the weather and sun information. If someone feels 
@@ -25,10 +26,13 @@ class Weather(object):
 
         with open(configs, 'r') as file:
             self.states = yaml.safe_load(file)['states']
-            self.states_iter = iter(self.states)
+            self.states_iter = itertools.islice(self.states, 1, None)
 
         self.initial_state = self.states[0]
         self.set_weather(self.initial_state)
+
+            
+
 
     def set_weather(self, state):
         # self._sun.set_azimuth(state.azimuth) see the comment on alititude in the yaml
@@ -46,6 +50,7 @@ class Weather(object):
 
     def next(self):
         print("\n\n\n\n called next \n\n\n\n")
+        
         try:
             state = self.states_iter.__next__()
             print(f"setting weather to", state['name'])

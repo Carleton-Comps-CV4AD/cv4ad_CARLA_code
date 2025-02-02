@@ -50,7 +50,7 @@ from utilities import quantize_to_tick, check_next_weather, check_dead, check_ha
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Data Collection')
-    parser.add_argument('--num_images_per_weather', type=int, default=20, help='Number of images to take per weather scenario')
+    parser.add_argument('--num_images_per_weather', type=int, default=1250, help='Number of images to take per weather scenario')
     parser.add_argument('--weather_config', type=str, default='six_weathers.yaml', help='Name of the weather configuration folder')
     parser.add_argument('--seconds_per_tick', type=float, default=3, help='Number of seconds between each photo taken')
     parser.add_argument('--debug', action='store_true', help='Run in debug mode')

@@ -1,7 +1,27 @@
 states:
-  # - name: clear_day
-  #   azimuth: 0 # ignoring this for now because I do not know what reasonable numbers for this are
-  #   altitude: 70
+  - name: clear_day
+    azimuth: 0 # ignoring this for now because I do not know what reasonable numbers for this are
+    altitude: 70
+    cloudiness: 0
+    precipitation: 0
+    precipitation_deposits: 0
+    wind_intensity: 0
+    fog_density: 0
+    wetness: 0
+
+  # - name: clear_night
+  #   azimuth: 0
+  #   altitude: -70
+  #   cloudiness: 0
+  #   precipitation: 0
+  #   precipitation_deposits: 0
+  #   wind_intensity: 0
+  #   fog_density: 0
+  #   wetness: 0
+  
+  # - name: clear_sunset
+  #   azimuth: 0
+  #   altitude: 10
   #   cloudiness: 0
   #   precipitation: 0
   #   precipitation_deposits: 0
@@ -9,52 +29,32 @@ states:
   #   fog_density: 0
   #   wetness: 0
 
-  - name: clear_night
-    azimuth: 0
-    altitude: -70
-    cloudiness: 0
-    precipitation: 0
-    precipitation_deposits: 0
-    wind_intensity: 0
-    fog_density: 0
-    wetness: 0
-  
-  - name: clear_sunset
-    azimuth: 0
-    altitude: 10
-    cloudiness: 0
-    precipitation: 0
-    precipitation_deposits: 0
-    wind_intensity: 0
-    fog_density: 0
-    wetness: 0
+  # - name: clear_wet_day
+  #   azimuth: 0
+  #   altitude: 70
+  #   cloudiness: 0
+  #   precipitation: 0
+  #   precipitation_deposits: 70
+  #   wind_intensity: 0
+  #   fog_density: 0
+  #   wetness: 70
 
-  - name: clear_wet_day
-    azimuth: 0
-    altitude: 70
-    cloudiness: 0
-    precipitation: 0
-    precipitation_deposits: 70
-    wind_intensity: 0
-    fog_density: 0
-    wetness: 70
+  # - name: rainy_day
+  #   azimuth: 0
+  #   altitude: 70
+  #   cloudiness: 50
+  #   precipitation: 70
+  #   precipitation_deposits: 70
+  #   wind_intensity: 0
+  #   fog_density: 0
+  #   wetness: 70
 
-  - name: rainy_day
-    azimuth: 0
-    altitude: 70
-    cloudiness: 50
-    precipitation: 70
-    precipitation_deposits: 70
-    wind_intensity: 0
-    fog_density: 0
-    wetness: 70
-
-  - name: foggy_day
-    azimuth: 0
-    altitude: 70
-    cloudiness: 20
-    precipitation: 0
-    precipitation_deposits: 0
-    wind_intensity: 0
-    fog_density: 50
-    wetness: 0
+  # - name: foggy_day
+  #   azimuth: 0
+  #   altitude: 70
+  #   cloudiness: 20
+  #   precipitation: 0
+  #   precipitation_deposits: 0
+  #   wind_intensity: 0
+  #   fog_density: 50
+  #   wetness: 0
