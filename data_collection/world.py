@@ -93,8 +93,8 @@ class World():
 
         for v in new_vehicles:
             v.set_autopilot(True) 
-            self.traffic_manager.random_left_lanechange_percentage(v, .1)
-            self.traffic_manager.random_right_lanechange_percentage(v, .1)
+            self.traffic_manager.random_left_lanechange_percentage(v, 0)
+            self.traffic_manager.random_right_lanechange_percentage(v, 0)
             self.traffic_manager.auto_lane_change(v, True)  
             self.traffic_manager.set_synchronous_mode(True)
         
