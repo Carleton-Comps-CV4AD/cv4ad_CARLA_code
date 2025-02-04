@@ -1,0 +1,10 @@
+states:
+  - name: rainy_day
+    azimuth: 0
+    altitude: 70
+    cloudiness: 50
+    precipitation: 70
+    precipitation_deposits: 70
+    wind_intensity: 0
+    fog_density: 0
+    wetness: 70
