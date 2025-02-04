@@ -43,6 +43,7 @@ from utilities import quantize_to_tick, check_next_weather, check_dead, check_ha
 #     - The latter of these seems to have helped a little, but there is still substatial blurring
 
 # - BUG: when frame rate is really high, the print statments for the counters for the camera but the images are synched so its weird
+# ! - We need to save the arguments to the output folder
 
 # python3 data_collection.py --seconds_per_tick 0.166667 --random_seed 123456 --video_mode --video_images_saved 18 --videos_wanted 500 --video_images_wait 30
 
@@ -51,7 +52,7 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Data Collection')
     parser.add_argument('--num_images_per_weather', type=int, default=1250, help='Number of images to take per weather scenario')
-    parser.add_argument('--weather_config', type=str, default='six_weathers.yaml', help='Name of the weather configuration folder')
+    parser.add_argument('--weather_config', type=str, default='clear_day.yaml', help='Name of the weather configuration folder')
     parser.add_argument('--seconds_per_tick', type=float, default=3, help='Number of seconds between each photo taken')
     parser.add_argument('--debug', action='store_true', help='Run in debug mode')
     parser.add_argument('--car_count', type=int, default=40, help='Number of cars to spawn')
