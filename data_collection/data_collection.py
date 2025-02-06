@@ -17,6 +17,7 @@ import cv2
 import numpy as np
 from queue import Queue, Empty
 import argparse
+import json
 
 from ego_vehicle import Ego_Vehicle, Camera
 from world import World
@@ -80,7 +81,9 @@ def main():
     video_images_saved = args.video_images_saved
     video_images_wait = args.video_images_wait
     videos_wanted = args.videos_wanted
-    
+
+
+
     if video_mode:
         if not video_images_saved or not videos_wanted:
             # saved < wait
@@ -91,6 +94,14 @@ def main():
 
     if random_seed:
         out_dir = out_dir + f"_seed:{random_seed}"
+
+    # save the arguments and configurations to a text file in the same output diectory
+    path_to_args = os.path.join(out_dir, 'arguments.json')
+    os.makedirs(out_dir, exist_ok=True)
+
+    with open(path_to_args, 'w') as arg_file:
+        json.dump(vars(args), arg_file, indent=4)
+
     
     try:
         sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (

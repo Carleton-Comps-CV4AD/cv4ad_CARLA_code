@@ -14,7 +14,18 @@ def quantize_to_tick(seconds_per_tick: int, world_delta_seconds: int) -> int:
 
 # Check if we need to progress the weather to the next state and if so, do it
 def check_next_weather(ego: Ego_Vehicle, world: World, num_images_per_weather: int, last_photo_count: int) -> int:
-    if ego.cameras[0].counter != last_photo_count and ego.cameras[0].counter % num_images_per_weather == 0:
+    if ego.cameras[0].counter != last_photo_count and ego.cameras[0].counter > 0 and ego.cameras[0].counter % num_images_per_weather == 0:
+
+        # ! logic used to identify 
+        # print("last phooto count: ", last_photo_count)
+
+
+        # print("\n\n this is the camera counter followed by if they equal: ", ego.cameras[0].counter)
+        # print(ego.cameras[0].counter != last_photo_count)
+
+        # print("this is the number of images we want per weather: ", num_images_per_weather)
+
+        # print(ego.cameras[0].counter % num_images_per_weather == 0)
         last_photo_count = ego.cameras[0].counter
 
         result = world.weather.next()
