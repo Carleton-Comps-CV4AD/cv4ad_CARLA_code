@@ -10,6 +10,7 @@ import os
 from pycocotools import mask
 import shutil
 import random
+import math
 
 def create_sub_masks(mask_image, width, height):
     # Initialize a dictionary of sub-masks indexed by RGB colors
@@ -67,7 +68,7 @@ def create_sub_mask_annotation(sub_mask):
         # segmentations.append(segmentation)
 
     segmentation = mask.encode(np.asfortranarray(sub_mask))
-    segmentation["counts"] = segmentation["counts"].decode("utf-8")
+    segmentation["counts"] = segmentation["counts"] # .decode("utf-8")
     
     return polygons, segmentation
 
@@ -156,84 +157,87 @@ def generate_vis_annotations(path_to_weather_types):
     print('Generating annotations...\n\n')
 
     weathers = os.listdir(path_to_weather_types)
+    splits = ['train', 'val']
     annotation_id = 1
 
     for weather in weathers:
 
-        ann = get_coco_json_format()
+        for split in splits:
 
-        category_dict = {
-            'pedestrian' : 12,
-            'rider' : 13,
-            'car' : 14,
-            'truck' : 15,
-            'bus' : 16,
-            'train': 17,
-            'motorcycle' : 18,
-            'bicycle' : 19
-        }
+            ann = get_coco_json_format()
 
-        ann['categories'] = create_category_annotation(category_dict)
+            category_dict = {
+                'pedestrian' : 12,
+                'rider' : 13,
+                'car' : 14,
+                'truck' : 15,
+                'bus' : 16,
+                'train': 17,
+                'motorcycle' : 18,
+                'bicycle' : 19
+            }
 
-        # get all videos from within the weather dir
-        weather_path = os.path.join(path_to_weather_types, weather, 'instance_seg')
-        videos = os.listdir(weather_path)
+            ann['categories'] = create_category_annotation(category_dict)
 
-        for i in range(len(videos)):
-            instances = {}
-            inst_id = 1
-            video_id = i+1
-            #get a list of all the image/frames of a video
-            image_path = os.path.join(weather_path, videos[i])
-            images = os.listdir(image_path)
+            # get all videos from within the weather dir
+            weather_path = os.path.join(path_to_weather_types, weather, split,  'instance_seg')
+            videos = os.listdir(weather_path)
 
-            #this funcitons assumes standard image  sizes set in the earlier code of 1920x1080
-            ann['videos'].append(create_video_annotation(video_id, videos[i]))
+            for i in range(len(videos)):
+                instances = {}
+                inst_id = 1
+                video_id = i+1
+                #get a list of all the image/frames of a video
+                image_path = os.path.join(weather_path, videos[i])
+                images = os.listdir(image_path)
 
-            for j in range(len(images)):
-                image_id = j+1
-                frame = os.path.join(image_path, images[j])
-                img = Image.open(frame)
+                #this funcitons assumes standard image  sizes set in the earlier code of 1920x1080
+                ann['videos'].append(create_video_annotation(video_id, videos[i]))
 
-                #add image information to the dictionary
-                ann['images'].append(create_image_annotation(os.path.join(videos[i],images[j]),img.width, img.height, image_id, j, video_id))
+                for j in range(len(images)):
+                    image_id = video_id * 100000 + (j+1)
+                    frame = os.path.join(image_path, images[j])
+                    img = Image.open(frame)
 
-                sub_masks = create_sub_masks(img, img.width, img.height)
+                    #add image information to the dictionary
+                    ann['images'].append(create_image_annotation(os.path.join(videos[i],images[j]),img.width, img.height, image_id, j, video_id))
 
-                for k,v in sub_masks.items():
-                    polygons, segmentation = create_sub_mask_annotation(v)
+                    sub_masks = create_sub_masks(img, img.width, img.height)
 
-                    if polygons != []:
-                        if len(polygons) > 1:
-                            # print(f"polygons: {polygons}")
-                            # print(f"Types in polygons: {[type(p) for p in polygons]}")
+                    for k,v in sub_masks.items():
+                        polygons, segmentation = create_sub_mask_annotation(v)
 
-                            polygon = MultiPolygon(polygons)
-                            # segmentation = segmentations
-                        else:
-                            polygon = polygons[0]
-                            # segmentation = [np.array(polygons[0].exterior.coords).ravel().tolist()] ##i forgot what this id donig
+                        if polygons != []:
+                            if len(polygons) > 1:
+                                # print(f"polygons: {polygons}")
+                                # print(f"Types in polygons: {[type(p) for p in polygons]}")
 
-                        cur_instance = "-".join(k.split()[1:])
+                                polygon = MultiPolygon(polygons)
+                                # segmentation = segmentations
+                            else:
+                                polygon = polygons[0]
+                                # segmentation = [np.array(polygons[0].exterior.coords).ravel().tolist()] ##i forgot what this id donig
 
-                        if cur_instance in instances:
-                            instance_id = instances[cur_instance]
-                        else:
-                            instances[cur_instance] = inst_id
-                            instance_id = inst_id
-                            inst_id += 1
+                            cur_instance = "-".join(k.split()[1:])
 
-                        # polygon, segmentation, image_id, category_id, annotation_id, video_id, instance_id, im_height, im_width
-                        annotation = create_annotation_format(polygon, segmentation, image_id, int(k[1:3]), annotation_id, video_id, instance_id, img.height, img.width)
-                        ann['annotations'].append(annotation)
-                        annotation_id += 1
+                            if cur_instance in instances:
+                                instance_id = instances[cur_instance]
+                            else:
+                                instances[cur_instance] = inst_id
+                                instance_id = inst_id
+                                inst_id += 1
 
-        
-        #dump the annotations for each weather pattern in a json dictionary
-        json_path = os.path.join(path_to_weather_types, weather, 'annotations.json')
+                            # polygon, segmentation, image_id, category_id, annotation_id, video_id, instance_id, im_height, im_width
+                            annotation = create_annotation_format(polygon, segmentation, image_id, int(k[1:3]), annotation_id, video_id, instance_id, img.height, img.width)
+                            ann['annotations'].append(annotation)
+                            annotation_id += 1
 
-        with open(json_path, "w") as file:
-            json.dump(ann, file, indent=4)
+            
+            #dump the annotations for each weather pattern in a json dictionary
+            json_path = os.path.join(path_to_weather_types, weather, split, 'annotations.json')
+
+            with open(json_path, "w") as file:
+                json.dump(ann, file, indent=4)
 
     print('\n\nFinished generating annotations!')
 
@@ -380,14 +384,49 @@ def split_train_val(path_to_weathers):
     # the main idea here is that we will split the cideos into train and val before generating annotations for each individual data split.
     weathers = os.listdir(path_to_weathers)
 
+    cameras = os.listdir(os.path.join(path_to_weathers, weathers[1]))
+    # print(cameras)
+    video_list = os.listdir(os.path.join(path_to_weathers, weathers[1], cameras[1]))
+    # print(video_list)
+
+    random.shuffle(video_list)
+
+    # now we want to split the videos into train and val
+    train_num = math.floor(0.8 * len(video_list))
+    splits = {}
+    splits['train'] = video_list[:train_num]
+    splits['val'] = video_list[train_num:]
+
+    for split in splits.keys():
+        for video in splits[split]:
+            # we want to go through each weather and then make a train folder if it doesn't exist then move the videos there
+            for weather in weathers:
+
+                path_to_set = os.path.join(path_to_weathers, weather, split)
+                os.makedirs(path_to_set, exist_ok=True)
+
+
+                for camera in cameras:
+                    os.makedirs(os.path.join(path_to_set, camera), exist_ok=True)
+
+                    cur_video_path = os.path.join(path_to_weathers, weather, camera, video)
+                    dest_video_path = os.path.join(path_to_set, camera, video)
+
+                    # print(cur_video_path)
+                    # print(dest_video_path)
+
+                    shutil.move(cur_video_path, dest_video_path)
+
+    # clean up all empty folders
     for weather in weathers:
-        cameras = os.listdir(os.path.join(path_to_weathers, weather))
-        videos = os.listdir(os.path.join(path_to_weathers, weather, cameras[1]))
+        for camera in cameras:
+            path_to_rm = os.path.join(path_to_weathers, weather, camera)
 
-        videos = random.shuffle(videos) # this will give us a rnaom shuffle for each weather but we want the same train test split for all of them so...
+            # print(path_to_rm)
 
-        # now you want to split the videos into train val folders that we ofc have to create
-    pass
+            if os.path.exists(path_to_rm):
+                # print(f"{path_to_rm} exists and we're removing it.")
+                shutil.rmtree(path_to_rm)
 
 
                 

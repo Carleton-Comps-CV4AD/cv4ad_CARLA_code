@@ -80,7 +80,7 @@ def main():
     seeds = random_seeds
 
     # a list of strings which are yamls
-    weathers = ["configs/clear_night", "configs/clear_sunset", "configs/clear_wet_day", "configs/foggy_day", "configs/rainy_day"] #["configs/clear_day", "configs/clear_night", "configs/clear_sunset", "configs/clear_wet_day", "configs/foggy_day", "configs/rainy_day"] 
+    weathers = ["configs/foggy_day", "configs/rainy_day"] #["configs/clear_day", "configs/clear_night", "configs/clear_sunset", "configs/clear_wet_day", "configs/foggy_day", "configs/rainy_day"] 
 
     while not os.path.exists("connector.txt"):
         time.sleep(1)
