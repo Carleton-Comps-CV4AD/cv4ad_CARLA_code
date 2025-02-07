@@ -135,22 +135,6 @@ def main():
         rgb_seg = Camera(our_world.world, sensor_queue, 'sensor.camera.semantic_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
                          name = 'rgb_seg', file_type = 'png', out_dir = out_dir,
                          seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
-        
-        if not video_mode:
-            lidar_cam = Camera(our_world.world, sensor_queue, 'sensor.lidar.ray_cast', carla.Transform(carla.Location(x=1.5, z=2.4)),
-                            name = 'lidar', file_type = 'ply', out_dir = out_dir,
-                            seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
-            lidar_seg = Camera(our_world.world, sensor_queue, 'sensor.lidar.ray_cast_semantic', carla.Transform(carla.Location(x=1.5, z=2.4)),
-                            name = 'lidar_seg', file_type = 'ply', out_dir = out_dir,
-                            seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
-            ego.add_camera(lidar_cam)
-            ego.add_camera(lidar_seg)
-        else:
-            instance_seg = Camera(our_world.world, sensor_queue, 'sensor.camera.instance_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
-                            name = 'instance_seg', file_type = 'png', out_dir = out_dir,
-                            seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
-            instance_seg.set_image_size()
-            ego.add_camera(instance_seg)
 
         rgb_cam.set_image_size()
         rgb_seg.set_image_size()
@@ -158,6 +142,23 @@ def main():
 
         ego.add_camera(rgb_cam)
         ego.add_camera(rgb_seg)
+
+        if not video_mode:
+            lidar_cam = Camera(our_world.world, sensor_queue, 'sensor.lidar.ray_cast', carla.Transform(carla.Location(x=1.5, z=2.4)),
+                            name = 'lidar', file_type = 'ply', out_dir = out_dir,
+                            seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
+            # lidar_seg = Camera(our_world.world, sensor_queue, 'sensor.lidar.ray_cast_semantic', carla.Transform(carla.Location(x=1.5, z=2.4)),
+            #                 name = 'lidar_seg', file_type = 'ply', out_dir = out_dir,
+            #                 seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
+            lidar_cam.set_lidar_settings(our_world.world.get_settings().fixed_delta_seconds)
+            ego.add_camera(lidar_cam)
+            # ego.add_camera(lidar_seg)
+        else:
+            instance_seg = Camera(our_world.world, sensor_queue, 'sensor.camera.instance_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
+                            name = 'instance_seg', file_type = 'png', out_dir = out_dir,
+                            seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
+            instance_seg.set_image_size()
+            ego.add_camera(instance_seg)
 
         # The way we have this organized is the car knows how many images to take per weather, and how many weathers there are.
         # It then passes this information to the camera objects, which are responsible for saving the images to different folders
@@ -189,7 +190,7 @@ def main():
             check_for_dead = check_dead(cur_image_num = ego.cameras[0].counter, check_for_dead = check_for_dead, world = our_world, interval = 15)
 
             # Check if we have a new image and if so, process it
-            check_has_image(ego, sensor_queue, our_world, debug, draw_bounding_box)
+            check_has_image(ego, sensor_queue, our_world, debug, draw_bounding_box, out_dir)
             
             check_for_dead = True       
 

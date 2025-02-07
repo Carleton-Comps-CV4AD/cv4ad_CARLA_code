@@ -5,6 +5,8 @@ import time
 import os
 import cv2
 import bounding_boxes as bb
+from lidar_projection import project
+import numpy as np
 
 def quantize_to_tick(seconds_per_tick: int, world_delta_seconds: int) -> int:
     ticks_per_image = seconds_per_tick // world_delta_seconds
@@ -47,11 +49,23 @@ def check_dead(cur_image_num: int, check_for_dead: bool, world: World, interval:
         return False
     return check_for_dead
 
-def check_has_image(ego: Ego_Vehicle, sensor_queue: Queue, world: World, debug: bool, draw_bounding_box: bool) -> None:
+def check_has_image(ego: Ego_Vehicle, sensor_queue: Queue, world: World, debug: bool, draw_bounding_box: bool, out_dir: str) -> None:
     if ego.cameras[0].has_new_image:
         try:
+            image = None
+            image_camera = None
+            lidar = None
+            lidar_camera = None
+
             for i in range(len(ego.cameras)):
                 img, sensor_name = sensor_queue.get(True, 2.0)
+                if sensor_name == 'sensor.camera.rgb':
+                    image = img
+                    image_camera = ego.cameras[i]
+                elif sensor_name == 'sensor.lidar.ray_cast':
+                    lidar = img
+                    lidar_camera = ego.cameras[i]
+                
                 if draw_bounding_box:
                     # Only try to draw bb on separate screen if the cur image is the rgb image
                     if sensor_name == 'sensor.camera.rgb' and ego.cameras[0].has_new_image:
@@ -65,6 +79,17 @@ def check_has_image(ego: Ego_Vehicle, sensor_queue: Queue, world: World, debug: 
                             if cv2.waitKey(10000) == ord('q'):
                                 break
                             cv2.destroyAllWindows()
+            if image and lidar:
+                lidar_2d = project(image_data = image, lidar_data = lidar,
+                    camera = image_camera.camera, camera_bp = image_camera.camera_blueprint, 
+                    lidar = lidar_camera.camera)
+                lidar_out_dir = os.path.join(out_dir, image_camera.weathers[image_camera.counter // image_camera.num_images_per_weather], 'lidar_2d')
+                if not os.path.exists(lidar_out_dir):
+                    os.makedirs(lidar_out_dir)
+                np.save(os.path.join(lidar_out_dir, f"{image_camera.counter}.npy"), lidar_2d)
+
+            else:
+                print("    Some of the sensor information is missed")
         except Empty:
             print("    Some of the sensor information is missed")
         ego.cameras[0].has_new_image = False

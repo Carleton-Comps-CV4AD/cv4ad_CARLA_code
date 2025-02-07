@@ -69,11 +69,19 @@ class Camera():
         self.camera_blueprint.set_attribute('image_size_x', x)
         self.camera_blueprint.set_attribute('image_size_y', y)
 
+    def set_lidar_settings(self, fixed_delta_seconds, upper_fov = 30, lower_fov = -25, channels = 64, range = 250, points_per_second = 600000):
+        self.camera_blueprint.set_attribute('upper_fov', str(upper_fov))
+        self.camera_blueprint.set_attribute('lower_fov', str(lower_fov))
+        self.camera_blueprint.set_attribute('channels', str(channels))
+        self.camera_blueprint.set_attribute('range', str(range))
+        self.camera_blueprint.set_attribute('points_per_second', str(points_per_second))
+        self.camera_blueprint.set_attribute('rotation_frequency', str(1/fixed_delta_seconds))
+
     def set_shutter_speed(self, speed = 60):
         self.camera_blueprint.set_attribute('shutter_speed', str(speed))
     
     def listen(self, image):
-        print(f"{self.name}, {self.counter}")
+        print(f"{self.name}, {self.counter}, {self.world.get_snapshot().frame}")
         if self.video_mode and (self.counter % (self.video_images_wait + self.video_images_saved)) >= self.video_images_saved:
             self.increment()
             return
