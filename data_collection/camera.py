@@ -69,7 +69,8 @@ class Camera():
         self.camera_blueprint.set_attribute('image_size_x', x)
         self.camera_blueprint.set_attribute('image_size_y', y)
 
-    def set_lidar_settings(self, fixed_delta_seconds, upper_fov = 30, lower_fov = -25, channels = 64, range = 250, points_per_second = 600000):
+    def set_lidar_settings(self, fixed_delta_seconds, upper_fov = 30, lower_fov = -25, channels = 64, range = 250, 
+                           points_per_second = 1 * 10**6):
         self.camera_blueprint.set_attribute('upper_fov', str(upper_fov))
         self.camera_blueprint.set_attribute('lower_fov', str(lower_fov))
         self.camera_blueprint.set_attribute('channels', str(channels))

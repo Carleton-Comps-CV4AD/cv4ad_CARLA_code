@@ -52,12 +52,12 @@ from utilities import quantize_to_tick, check_next_weather, check_dead, check_ha
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Data Collection')
-    parser.add_argument('--num_images_per_weather', type=int, default=1250, help='Number of images to take per weather scenario')
-    parser.add_argument('--weather_config', type=str, default='clear_day.yaml', help='Name of the weather configuration folder')
-    parser.add_argument('--seconds_per_tick', type=float, default=3, help='Number of seconds between each photo taken')
+    parser.add_argument('--num_images_per_weather', type=int, default=400, help='Number of images to take per weather scenario')
+    parser.add_argument('--weather_config', type=str, default='configs/clear_day.yaml', help='Name of the weather configuration folder')
+    parser.add_argument('--seconds_per_tick', type=float, default=5, help='Number of seconds between each photo taken')
     parser.add_argument('--debug', action='store_true', help='Run in debug mode')
-    parser.add_argument('--car_count', type=int, default=40, help='Number of cars to spawn')
-    parser.add_argument('--walker_count', type=int, default=40, help='Number of walkers to spawn')
+    parser.add_argument('--car_count', type=int, default=30, help='Number of cars to spawn')
+    parser.add_argument('--walker_count', type=int, default=30, help='Number of walkers to spawn')
     parser.add_argument('--output_dir', type=str, default=os.path.join('/Data', time.strftime("%m%d-%H%M")), help='Output directory for images')
     parser.add_argument('--draw_bounding_box', action='store_true', help='Draw bounding boxes on images')
     parser.add_argument('--random_seed', type=int, help='Use deterministic mode with this seed', default=None)
@@ -93,7 +93,7 @@ def main():
         print(f"Setting num images per weather to {num_images_per_weather} to capture {videos_wanted} videos with {video_images_saved} images each, waiting {video_images_wait} images between videos")
 
     if random_seed:
-        out_dir = out_dir + f"_seed:{random_seed}"
+        out_dir = out_dir + f"_seed_{random_seed}"
 
     # save the arguments and configurations to a text file in the same output diectory
     path_to_args = os.path.join(out_dir, 'arguments.json')
@@ -130,11 +130,11 @@ def main():
         # configuring and spawning the camera actors. It feels like the camera class should be responsible for this, but it's not.
         # And we also configure a bunch of stuff in main and its all kind of terrible :/
         rgb_cam = Camera(our_world.world, sensor_queue, 'sensor.camera.rgb', carla.Transform(carla.Location(x=1.5, z=2.4)), 
-                         name = 'rgb', file_type = 'png', cc = carla.ColorConverter.Raw, out_dir = out_dir,
-                         seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
+                        name = 'rgb', file_type = 'png', cc = carla.ColorConverter.Raw, out_dir = out_dir,
+                        seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
         rgb_seg = Camera(our_world.world, sensor_queue, 'sensor.camera.semantic_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
-                         name = 'rgb_seg', file_type = 'png', out_dir = out_dir,
-                         seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
+                        name = 'rgb_seg', file_type = 'png', out_dir = out_dir,
+                        seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
 
         rgb_cam.set_image_size()
         rgb_seg.set_image_size()
@@ -142,6 +142,8 @@ def main():
 
         ego.add_camera(rgb_cam)
         ego.add_camera(rgb_seg)
+
+        time.sleep(3)
 
         if not video_mode:
             lidar_cam = Camera(our_world.world, sensor_queue, 'sensor.lidar.ray_cast', carla.Transform(carla.Location(x=1.5, z=2.4)),
@@ -152,7 +154,6 @@ def main():
             #                 seconds_per_tick = seconds_per_tick, video_mode_state = video_mode, video_wait = video_images_wait, video_images_saved=video_images_saved)
             lidar_cam.set_lidar_settings(our_world.world.get_settings().fixed_delta_seconds)
             ego.add_camera(lidar_cam)
-            # ego.add_camera(lidar_seg)
         else:
             instance_seg = Camera(our_world.world, sensor_queue, 'sensor.camera.instance_segmentation', carla.Transform(carla.Location(x=1.5, z=2.4)),
                             name = 'instance_seg', file_type = 'png', out_dir = out_dir,
@@ -164,7 +165,7 @@ def main():
         # It then passes this information to the camera objects, which are responsible for saving the images to different folders
         # based on which weather is currently active. This is a little convoluted, but it works.
         ego.configure_experiment(num_images_per_weather, [state['name'] for state in our_world.weather.states])
-
+        
         # Spawn cars and walkers
         spawned = our_world.spawn_car(number = car_count)
         print(f"spawned {spawned}/{car_count} attempted cars")
@@ -177,9 +178,9 @@ def main():
 
         last_photo_count = -1
         check_for_dead = True
+        our_world.world.tick() 
 
         while True:
-            our_world.world.tick()  
             # Try and progress the weather to the next state if we have taken enough images for the current weather
             last_photo_count = check_next_weather(ego, our_world, num_images_per_weather, last_photo_count)
             if last_photo_count < -1:
@@ -192,7 +193,9 @@ def main():
             # Check if we have a new image and if so, process it
             check_has_image(ego, sensor_queue, our_world, debug, draw_bounding_box, out_dir)
             
-            check_for_dead = True       
+            check_for_dead = True 
+
+            our_world.world.tick()  
 
     finally:
         # These cameras are our camera objects so they need to destroy themselves

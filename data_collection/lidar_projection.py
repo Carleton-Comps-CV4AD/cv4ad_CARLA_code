@@ -42,7 +42,8 @@ def get_distances(p_cloud):
     distances = np.linalg.norm(coordinates, axis=1)
     return distances
 
-def project(image_data, lidar_data, camera: carla.Actor, camera_bp: carla.ActorBlueprint, lidar: carla.Actor):
+def project(image_data, lidar_data, camera: carla.Actor, camera_bp: carla.ActorBlueprint, lidar: carla.Actor, 
+            camera_transform: carla.Transform, lidar_transform: carla.Transform):
     # Build the K projection matrix:
     # K = [[Fx,  0, image_w/2],
     #      [ 0, Fy, image_h/2],
@@ -86,13 +87,16 @@ def project(image_data, lidar_data, camera: carla.Actor, camera_bp: carla.ActorB
         local_lidar_points, [np.ones(local_lidar_points.shape[1])]]
 
     # This (4, 4) matrix transforms the points from lidar space to world space.
-    lidar_2_world = lidar.get_transform().get_matrix()
+    # lidar_2_world = lidar.get_transform().get_matrix()
+    lidar_2_world = camera.get_transform().get_matrix()
+    # lidar_2_world = lidar_transform.get_matrix()
 
     # Transform the points from lidar space to world space.
     world_points = np.dot(lidar_2_world, local_lidar_points)
 
     # This (4, 4) matrix transforms the points from world to sensor coordinates.
     world_2_camera = np.array(camera.get_transform().get_inverse_matrix())
+    # world_2_camera = np.array(camera_transform.get_inverse_matrix())
 
     # Transform the points from world space to camera space.
     sensor_points = np.dot(world_2_camera, world_points)

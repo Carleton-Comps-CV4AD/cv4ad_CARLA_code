@@ -50,7 +50,7 @@ def check_dead(cur_image_num: int, check_for_dead: bool, world: World, interval:
     return check_for_dead
 
 def check_has_image(ego: Ego_Vehicle, sensor_queue: Queue, world: World, debug: bool, draw_bounding_box: bool, out_dir: str) -> None:
-    if ego.cameras[0].has_new_image:
+    if ego.cameras[-1].has_new_image:
         try:
             image = None
             image_camera = None
@@ -82,7 +82,10 @@ def check_has_image(ego: Ego_Vehicle, sensor_queue: Queue, world: World, debug: 
             if image and lidar:
                 lidar_2d = project(image_data = image, lidar_data = lidar,
                     camera = image_camera.camera, camera_bp = image_camera.camera_blueprint, 
-                    lidar = lidar_camera.camera)
+                    lidar = lidar_camera.camera, 
+                    camera_transform = image_camera.transform_at_last_image,
+                    lidar_transform = lidar_camera.transform_at_last_image)
+
                 lidar_out_dir = os.path.join(out_dir, image_camera.weathers[image_camera.counter // image_camera.num_images_per_weather], 'lidar_2d')
                 if not os.path.exists(lidar_out_dir):
                     os.makedirs(lidar_out_dir)
@@ -92,5 +95,5 @@ def check_has_image(ego: Ego_Vehicle, sensor_queue: Queue, world: World, debug: 
                 print("    Some of the sensor information is missed")
         except Empty:
             print("    Some of the sensor information is missed")
-        ego.cameras[0].has_new_image = False
-        time.sleep(0.3)
+        ego.cameras[-1].has_new_image = False
+        # time.sleep(0.7)

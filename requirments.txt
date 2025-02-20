@@ -1,0 +1,9 @@
+Package       Version
+------------- ---------
+carla         0.9.15
+numpy         1.19.5
+opencv-python 4.11.0.86
+pillow        10.4.0
+pip           23.0.1
+PyYAML        6.0.2
+setuptools    56.0.0
