@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 
-#from google gemnni
+#adapted from google gemini
 
 
 def apply_curve(image, curve):
@@ -38,22 +38,3 @@ def create_curve(points):
    return curve
 
 
-# # Load the image
-# image = cv2.imread('700.png')
-
-
-# # Define control points for the curve
-# # Example: S-curve for contrast enhancement
-# points = [(0, 0), (7, 34), (35, 64), (80, 66), (110, 145), (142, 135), (175, 173), (180, 200), (194, 175), (202, 153), (216, 253), (255, 255)]
-
-
-# # Create the curve LUT
-# curve = create_curve(points)
-
-
-# # Apply the curve to the image
-# enhanced_image = apply_curve(image, curve)
-
-
-# # Display or save the enhanced image
-# cv2.imwrite('700dw.png', enhanced_image)
