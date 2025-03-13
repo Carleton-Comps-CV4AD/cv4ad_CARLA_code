@@ -6,12 +6,16 @@ import cv2
 import os
 import json
 
+#Uses an ODGT file which has sections "fpath_img" which is the path to the simulated image.
+
 #main Curve
 points = [(0, 0), (7, 34), (35, 64), (80, 66), (110, 145), (142, 135), (175, 173), (180, 200), (194, 175), (202, 153), (216, 253), (255, 255)]
 
 
 # Create the curve LUT
 curve = create_curve(points)
+
+#Give correct paths and run the file
 output_dir = "/Data/..."
 os.makedirs(output_dir, exist_ok=True)
 odgt_file_path = "/Data/..."
